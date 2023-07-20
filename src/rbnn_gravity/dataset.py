@@ -18,10 +18,10 @@ class Measurement(Dataset):
         self.omega = npzfiles['omega']
 
     def __len__(self):
-        return len(self.R)
+        return len(self.R) - 1
 
     def __getitem__(self, idx):
-        return self.R[idx], self.omega[idx]
+        return self.R[idx:idx+2], self.omega[idx:idx+2]
 
 
 def build_dataloader(args):

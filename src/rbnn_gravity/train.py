@@ -10,7 +10,10 @@ def train(args, model, videos_dataloader, retrain=False):
     # define t as something less than T
     t = 1
     training_loss = []
-
+    
+    # TO Read: cosine loss and if it is a better one to use instead of MSE for omega
+    loss_fcn = torch.nn.MSELoss()
+    
     params = model.parameters()
     optim = torch.optim.Adam(params)
     
@@ -19,6 +22,9 @@ def train(args, model, videos_dataloader, retrain=False):
     for epoch in range(config.experiment.n_epoch):
         for idx, data in enumerate(videos_dataloader):
             R_data, omega_data = data
+            R_data.requires_grad = True
+            # omega_data.requires_grad = True
+            # import pdb; pdb.set_trace()
             # print(R_data.shape, omega_data.shape)
         
             R_cur, R_next = R_data[:, :t].type(torch.float), R_data[:, t:].type(torch.float)
@@ -32,7 +38,7 @@ def train(args, model, videos_dataloader, retrain=False):
             loss.backward()
             optim.step()
         
-            if idx % print_every == 0:
+            if idx % config.experiment.print_every == 0:
               batch_loss = loss.item()
               training_loss.append(batch_loss)
               print(batch_loss)
@@ -46,8 +52,6 @@ def run_experiment(
 
     params = model.parameters()
     optim = torch.optim.Adam(params)
-    # TO Read: cosine loss and if it is a better one to use instead of MSE for omega
-    loss_fcn = torch.nn.MSELoss()
     
     videos_dataloader = build_dataloader(args)
     model = RBNN()
