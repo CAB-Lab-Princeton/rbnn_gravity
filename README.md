@@ -4,4 +4,4 @@ A work in progress ...
 
 ## Documentation
 
-The latest version of hgan documentation is available [here](https://CAB-Lab-Princeton.github.io/rbnn_gravity/).
+The latest version of rbnn_gravity documentation is available [here](https://CAB-Lab-Princeton.github.io/rbnn_gravity/).
