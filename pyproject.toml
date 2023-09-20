@@ -7,7 +7,8 @@ name = "rbnn_gravity"
 version = "0.0.1"
 authors = [
   { name="Christine Allen-Blanchette", email="ca15@princeton.edu" },
-  { name="Harsh Sharma", email="hasharma@ucsd.edu " }
+  { name="Harsh Sharma", email="hasharma@ucsd.edu " },
+  { name="Justice Mason", email="jjmason@princeton.edu " }		
 ]
 description = "A package to predict rigid body dynamics in the presence of gravity"
 readme = "README.md"
