@@ -27,6 +27,18 @@ def hat_map(a, device = None, mode = "torch", requires_grad=True):
                       [-a[1], a[0], 0]])
     return a_hat
 
+def s2s2_gram_schmidt(v1, v2):
+    """Normalise 2 3-vectors. Project second to orthogonal component.
+    Take cross product for third. Stack to form SO matrix."""
+    # assert torch.any(v1.isnan()) == False and torch.any(v1.isinf()) == False
+    # assert torch.any(v2.isnan()) == False and torch.any(v2.isinf()) == False
+    u1 = v1
+    e1 = u1 / u1.norm(p=2, dim=-1, keepdim=True).clamp(min=1E-5)
+    u2 = v2 - (e1 * v2).sum(-1, keepdim=True) * e1
+    e2 = u2 / u2.norm(p=2, dim=-1, keepdim=True).clamp(min=1E-5)
+    
+    e3 = torch.cross(e1, e2)
+    return torch.stack([e1, e2, e3], 1)
 
 def setup_reproducibility(seed):
     torch.manual_seed(seed)
