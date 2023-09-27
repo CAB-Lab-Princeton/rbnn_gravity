@@ -91,6 +91,41 @@ class RBNN(MLP):
 
     return M
 
+class HD_RBNN_gravity(nn.Module):
+  def __init__(self, encoder,
+                decoder,
+                integrator):
+    super().__init__()
+    self.encoder = encoder
+    self.decoder = decoder
+    self.integrator = integrator
+
+    self.I_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3)
+    self.I_off_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3)  
+  
+  def calc_I(self):
+    """
+    """
+    moi = pd_matrix(diag=self.I_diag, off_diag=self.I_off_diag)
+    return moi
+  
+  def encode(self, x: torch.Tensor) -> torch.Tensor:
+    """
+    Method to encode from image space to SE(3) latent space
+    """
+    pass
+
+  def decode(self):
+    pass
+
+  def forward(self):
+    pass
+
+  def velocity_estimator(self):
+    pass
+
+  def state_update(self):
+    pass
 
 def build_V_gt(m, g, e_3, R, rho_gt):
   # print(m, g, e_3, R.shape, rho_gt)
