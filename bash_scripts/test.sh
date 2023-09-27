@@ -1,0 +1,1 @@
+CUDA_VISIBLE=0 python src/rbnn_gravity/run.py 
