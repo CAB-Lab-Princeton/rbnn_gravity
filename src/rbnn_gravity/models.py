@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 import numpy as np
-import rbnn_gravity.utils
-from rbnn_gravity.utils import hat_map, vee_map
+import rbnn_gravity.utils.utils
+from rbnn_gravity.utils.utils import hat_map, vee_map, pd_matrix
 
 
 class MLP(nn.Module):
@@ -91,14 +91,69 @@ class RBNN(MLP):
 
     return M
 
-class HD_RBNN_gravity(nn.Module):
+class RBNN_gravity(nn.Module):
+  def __init__(self,
+                integrator,
+                in_dim: int = 9,
+                hidden_dim: int = 50,
+                out_dim: int = 1,
+                tau: int = 2,
+                dt: float = 1e-3,
+                I_diag: torch.Tensor = None,
+                I_off_diag: torch.Tensor = None,
+                V = None):
+    """
+    ...
+    """
+    super().__init__()
+    self.integrator = integrator
+    self.tau = tau
+    self.dt =dt
+
+    self.V = MLP(in_dim, hidden_dim, out_dim) if V is None else V
+
+    # Moment-of-inertia tensor -- assert that requires_grad is on for learning
+    self.I_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3) if I_diag is None else I_diag
+    self.I_off_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3) if I_off_diag is None else I_off_diag
+
+    assert self.I_diag.requires_grad == True and self.I_off_diag.requires_grad == True
+
+  def calc_moi(self):
+    """
+    ...
+
+    """
+    moi = pd_matrix(diag=self.I_diag, off_diag=self.I_off_diag)
+    return moi
+  
+  def forward(self, R_seq: torch.Tensor, pi_seq: torch.Tensor, seq_len: int = 100):
+    """
+    ...
+
+    """
+    # Calculate moment-of-inertia tensor
+    moi = self.calc_moi()
+
+    # Grab initial conditions
+    R_init = R_seq[:, 0, ...][:, None, ...]
+    pi_init = pi_seq[:, 0, ...][:, None, ...]
+
+    # Integrate full trajectory
+    R_pred, pi_pred = self.integrator.integrate(pi_init=pi_init, R_init=R_init, moi=moi, timestep=self.dt, traj_len=seq_len)
+
+    return R_pred, pi_pred
+
+
+class HD_RBNN_gravity(RBNN_gravity):
   def __init__(self, encoder,
                 decoder,
-                integrator):
+                integrator,
+                estimator):
     super().__init__()
     self.encoder = encoder
     self.decoder = decoder
     self.integrator = integrator
+    self.estimator = MLP(self.in_dim * self.tau, self.hidden_dim, 3) if estimator is None else estimator
 
     self.I_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3)
     self.I_off_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3)  
