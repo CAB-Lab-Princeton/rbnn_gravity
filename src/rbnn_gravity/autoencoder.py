@@ -6,12 +6,12 @@
 import sys, os
 import torch
 from torch import nn
-from utils import *
+from rbnn_gravity.utils.utils import *
 
 # Todo: 
 #   - Get rid of the maxpooling layers
 #   - ELU activation layers might need to be changed 
-#   - ELU requires using Kaimming/He initialization -- right now using Xavier initialization
+#   - ELU requires using Kaiming/He initialization -- right now using Xavier initialization
 
 class EncoderNetSE3(nn.Module):
     """
