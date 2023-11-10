@@ -1,45 +1,153 @@
+# Author(s): Justice Mason
+# Project: RBNN + Gravity
+# Date: 11/07/23
+import sys, os
+
+import argparse
 import torch
-from rbnn_gravity.models import RBNN
-from rbnn_gravity.configuration import config
-from rbnn_gravity.models import build_V_gt
 import numpy as np
 
+# Append parent directory
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
 
-N = 10
-T = 10
-m = 1.0
-g = 10.0
-dt = 1e-3
+from models import build_V_gravity
+from data.data_utils import *
+from utils.math import *
+from utils.general import *
+from utils.integrators import LieGroupVaritationalIntegrator
 
-e_3 = torch.tensor([[0], [0], [1]], dtype=torch.float32)
-I_gt = torch.diag(torch.tensor([1, 2.8, 2], dtype=torch.float32))
-rho_gt = torch.tensor([0, 0, 1], dtype=torch.float32)
+def get_args():
+    parser = argparse.ArgumentParser()
 
-omega_0 = torch.tensor([0.5, -0.5, 0.4], dtype=torch.float32)
-R_0 = torch.eye(3, requires_grad=True, dtype=torch.float32)
+    parser.add_argument(
+        "--gpuid",
+        type=int,
+        default=0,
+        help="The default GPU ID to use. Set -1 to use cpu.",
+    )
+    parser.add_argument("--ngpu", type=int, default=1, help="Number of gpus to use")
 
-V_gt = lambda R: build_V_gt(m, g, e_3, R, rho_gt)
+    parser.add_argument(
+        "--data_save_dir",
+        type=str,
+        help="set directory where data is saved",
+        required=True,
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        help="set filename",
+        required=True,
+    )
+    parser.add_argument(
+        "--n_examples",
+        type=int,
+        default=100,
+        help="set number of examples, default: 100",
+    )
+    parser.add_argument(
+        "--traj_len",
+        type=int,
+        default=100,
+        help="set trajectory length, default: 100",
+    )
+    parser.add_argument(
+        "--seq_len",
+        type=int,
+        default=10,
+        help="set sample sequence length, default: 10",
+    )
+    parser.add_argument(
+        "--dt",
+        type=float,
+        default=1e-3,
+        help="set dt, default: 1e-3",
+    )
+    parser.add_argument(
+        "--mass",
+        type=float,
+        default=1.0,
+        help="set mass, default: 1.0",
+    )
+    parser.add_argument(
+        "--moi_diag_gt",
+        type=float,
+        nargs='+',
+        default=None,
+        required=True,
+        help="set ground-truth moi diagonal entries, default: None",
+    )
+    parser.add_argument(
+        "--moi_off_diag_gt",
+        type=float,
+        nargs='+',
+        default=None,
+        required=True,
+        help="set ground-truth moi off-diagonal entries, default: None",
+    )
+    parser.add_argument(
+        "--radius",
+        type=float,
+        default=50.0,
+        help="set angular momentum sphere radius, default: 50.0",
+    )
+    parser.add_argument(
+        "--ic_type",
+        choices=['random', 'unstable', 'desired'],
+        default='random',
+        help="set angular momentum sphere radius, default: 50.0",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=0, help="set random seed"
+    ) 
 
-# TODO: put integrator
-gt_rbnn = RBNN(indim=9, hiddim=50, outdim=1, I=I_gt, V=V_gt)
+    args = parser.parse_args()
+    return args
 
-R = R_0  # Convert R_0 to a tensor
-# print(R_0)
-omega = omega_0  # Convert omega_0 to a tensor
-# print(omega_0)
-R=R.unsqueeze(0)
-omega=omega.unsqueeze(0)
-# TO DO: we need to verify the integrator works well first so import data
-# from MATLAB and then compute or plot
-for i in range(N * T-1):
-    R_next, omega_next = gt_rbnn(R[-1,:], omega[-1,:])
-    R = torch.cat((R, R_next.unsqueeze(0)), dim=0)  # Concatenate R_next to the tensor R
-    omega = torch.cat((omega, omega_next.unsqueeze(0)), dim=0)
-    # print(R_next)
+def main():
+    """
+    """
+    # Initialize arguments
+    args = get_args()
 
-R_np = R.detach().numpy()
-omega_np = omega.detach().numpy()
-t_np = np.linspace(0, N*T*dt-dt, num=N*T)
+    # Seed computation
+    setup_reproducibility(args.seed)
 
-with open('/home/ca15/projects/rbnn_gravity/src/rbnn_gravity/data/data.npz', 'wb') as outfile:
-    np.savez(outfile, R=R_np, omega=omega_np)
+    # Constants
+    g = 9.81 # [m/s2]
+    e_3 = torch.tensor([[0., 0., 1.]]).T
+    rho_gt = torch.tensor([[0., 0., 1.]])
+
+    # Initialize values
+    moi = pd_matrix(diag=torch.tensor(args.moi_diag_gt), off_diag=torch.tensor(args.moi_off_diag_gt))
+    print(f'\n Ground-truth moment of inertia: \n {moi} \n')
+
+    # Initialize potential function
+    V_gravity = lambda R: build_V_gravity(m=args.mass, g=g, e_3=e_3, R=R, rho_gt=rho_gt)
+
+    # Integrator
+    integrator = LieGroupVaritationalIntegrator(moi=moi, V=V_gravity)
+
+    # Random sampling ICs + integrating
+    print(f'\n Generating dataset -- n_samples:{args.n_examples} --traj_len:{args.traj_len} \n')
+
+    data_R, data_pi = generate_lowdim_dataset(MOI=moi, 
+                            radius=args.radius, 
+                            n_samples=args.n_examples, 
+                            integrator=integrator,
+                            timestep=args.dt,
+                            traj_len=args.traj_len,
+                            ic_type=args.ic_type,
+                            seed=args.seed)
+    
+    # Convert to omega, numpy, and save
+    moi_inv = torch.linalg.inv(moi)
+    data_omega = torch.einsum('ij, btj -> bti', moi_inv, data_pi)
+
+    print(f'\n Saving generated dataset in directory: {args.data_save_dir} \n')
+    save_data(data_R=data_R, data_omega=data_omega, filename=args.name, save_dir=args.data_save_dir)
+
+if __name__ == "__main__":
+    main()
+
