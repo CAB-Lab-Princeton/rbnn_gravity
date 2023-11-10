@@ -1,7 +1,7 @@
 import time
 import torch 
 from rbnn_gravity.models import RBNN
-from rbnn_gravity.utils import setup_reproducibility
+from rbnn_gravity.utils.math import setup_reproducibility
 from rbnn_gravity.dataset import build_dataloader
 from rbnn_gravity.configuration import config
 
@@ -23,10 +23,7 @@ def train(args, model, videos_dataloader, retrain=False):
         for idx, data in enumerate(videos_dataloader):
             R_data, omega_data = data
             R_data.requires_grad = True
-            # omega_data.requires_grad = True
-            # import pdb; pdb.set_trace()
-            # print(R_data.shape, omega_data.shape)
-        
+            
             R_cur, R_next = R_data[:, :t].type(torch.float), R_data[:, t:].type(torch.float)
             omega_cur, omega_next = omega_data[:, :t].type(torch.float), omega_data[:, t:].type(torch.float)
             # print(R_cur.shape, omega_cur.shape)
