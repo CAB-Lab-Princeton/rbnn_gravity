@@ -6,7 +6,7 @@
 import sys, os
 import torch
 from torch import nn
-from rbnn_gravity.utils.utils import *
+from rbnn_gravity.utils.math import *
 
 # Todo: 
 #   - Get rid of the maxpooling layers
