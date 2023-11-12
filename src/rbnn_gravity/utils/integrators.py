@@ -10,10 +10,8 @@ class LieGroupVaritationalIntegrator():
     """
     
     """
-    def __init__(self, moi: torch.Tensor, V):
+    def __init__(self):
         super().__init__()
-        self.moi = moi
-        self.V = V
         
     def skew(self, v: torch.Tensor):
         
@@ -27,14 +25,14 @@ class LieGroupVaritationalIntegrator():
     
         return S
     
-    def calc_M(self, R: torch.Tensor) -> torch.Tensor:
+    def calc_M(self, R: torch.Tensor, V) -> torch.Tensor:
         """"""
         bs, _, _ = R.shape
 
         # Calc V(q)
         q = R.reshape(bs, 9)
         q.requires_grad = True
-        V_q = self.V(q)
+        V_q = V(q)
 
         # Calc gradient 
         dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
@@ -70,11 +68,11 @@ class LieGroupVaritationalIntegrator():
         grad_Ac = self.skew(a_vec) + torch.einsum('b, bij -> bij', torch.einsum('bi, bi -> b', a_vec, fc), torch.unsqueeze(torch.eye(3), 0).repeat(fc.shape[0], 1, 1)) + torch.einsum('bi, bj -> bij', fc, a_vec) - (2 * moi)
         return grad_Ac
     
-    def optimize_fc(self, R_vec: torch.Tensor, pi_vec: torch.Tensor, moi: torch.Tensor, fc_list: list = [], timestep: float = 1e-3, max_iter: int = 1000, tol: float = 1e-3) -> list:
+    def optimize_fc(self, R_vec: torch.Tensor, pi_vec: torch.Tensor, moi: torch.Tensor, V, fc_list: list = [], timestep: float = 1e-3, max_iter: int = 1000, tol: float = 1e-3) -> list:
         """
         """
         it = 0
-        M_vec = self.calc_M(R=R_vec)
+        M_vec = self.calc_M(R=R_vec, V=V)
 
         if not fc_list:
             a_vec = timestep * (pi_vec + (0.5 * timestep) * M_vec)
@@ -98,22 +96,22 @@ class LieGroupVaritationalIntegrator():
             
         return fc_list
     
-    def step(self, R_i: torch.Tensor, pi_i: torch.Tensor, moi: torch.Tensor, fc_list: list = [], timestep: float = 1e-3):
+    def step(self, R_i: torch.Tensor, pi_i: torch.Tensor, moi: torch.Tensor, V, fc_list: list = [], timestep: float = 1e-3):
         """
         """
-        fc_list = self.optimize_fc(R_vec=R_i, pi_vec=pi_i, moi=moi, timestep=timestep, fc_list=fc_list)
+        fc_list = self.optimize_fc(R_vec=R_i, pi_vec=pi_i, moi=moi, timestep=timestep, fc_list=fc_list, V=V)
         
         fc_opt = fc_list[-1]
         F_i = self.cayley_transx(fc=fc_opt)
         R_ii = torch.einsum('bij, bjk -> bik', R_i, F_i)
         
-        M_i = self.calc_M(R=R_i)
-        M_ii = self.calc_M(R=R_ii)
+        M_i = self.calc_M(R=R_i, V=V)
+        M_ii = self.calc_M(R=R_ii, V=V)
         pi_ii = torch.einsum('bji, bj -> bi', F_i, pi_i) + torch.einsum('bji, bj -> bi', 0.5 * timestep * F_i, M_i) + (0.5 * timestep) * M_ii
         
         return R_ii, pi_ii, fc_list
     
-    def integrate(self, pi_init: torch.Tensor, R_init: torch.Tensor, moi: torch.Tensor, timestep: float = 1e-3, traj_len: int = 100):
+    def integrate(self, pi_init: torch.Tensor, R_init: torch.Tensor, moi: torch.Tensor, V, timestep: float = 1e-3, traj_len: int = 100):
         """
         """
         pi_list = [pi_init.float()]
@@ -124,7 +122,7 @@ class LieGroupVaritationalIntegrator():
             R_i = R_list[-1]
             pi_i = pi_list[-1]
             
-            R_ii, pi_ii, fc_list = self.step(R_i=R_i, pi_i=pi_i, moi=moi, fc_list=fc_list, timestep=timestep)
+            R_ii, pi_ii, fc_list = self.step(R_i=R_i, pi_i=pi_i, moi=moi, V=V, fc_list=fc_list, timestep=timestep)
             
             R_list.append(R_ii)
             pi_list.append(pi_ii)
