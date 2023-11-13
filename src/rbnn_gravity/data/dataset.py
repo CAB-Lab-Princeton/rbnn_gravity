@@ -4,7 +4,7 @@ import glob
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
-from rbnn_gravity.configuration import config
+# from rbnn_gravity.configuration import config
 
 # Measurement dataset class
 class LowDimDataset(Dataset):
