@@ -46,12 +46,13 @@ class rbnn_gravity(nn.Module):
     self.integrator = integrator
     self.tau = tau
     self.dt = dt
+    self.device = None
 
     self.V = MLP(in_dim, hidden_dim, out_dim) if V is None else V
 
     # Moment-of-inertia tensor -- assert that requires_grad is on for learning
-    self.I_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3) if I_diag is None else I_diag
-    self.I_off_diag = torch.rand(3, requires_grad=True) / torch.sqrt(3) if I_off_diag is None else I_off_diag
+    self.I_diag = torch.rand(3, requires_grad=True) / np.sqrt(3) if I_diag is None else I_diag
+    self.I_off_diag = torch.rand(3, requires_grad=True) / np.sqrt(3) if I_off_diag is None else I_off_diag
 
     assert self.I_diag.requires_grad == True and self.I_off_diag.requires_grad == True
 
@@ -71,18 +72,18 @@ class rbnn_gravity(nn.Module):
     """
     # Calculate moment-of-inertia tensor and pi_seq
     moi = self.calc_moi()
-    pi_seq = torch.einsum('ij, btjk -> btik', moi, omega_seq)
+    pi_seq = torch.einsum('ij, btj -> bti', moi, omega_seq)
 
     # Grab initial conditions
-    R_init = R_seq[:, 0, ...][:, None, ...]
-    pi_init = pi_seq[:, 0, ...][:, None, ...]
+    R_init = R_seq[:, 0, ...]
+    pi_init = pi_seq[:, 0, ...]
 
     # Integrate full trajectory
     R_pred, pi_pred = self.integrator.integrate(pi_init=pi_init, R_init=R_init, V=self.V, moi=moi, timestep=self.dt, traj_len=seq_len)
 
     # Calc omega_pred
     moi_inv = torch.linalg.inv(moi)
-    omega_pred = torch.einsum('ij, btjk -> btik', moi_inv, pi_pred)
+    omega_pred = torch.einsum('ij, btj -> bti', moi_inv, pi_pred)
 
     return R_pred, omega_pred
 
