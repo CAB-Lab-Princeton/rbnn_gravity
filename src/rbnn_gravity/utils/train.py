@@ -9,7 +9,7 @@ import torch
 
 from data.dataset import build_dataloader
 from models import rbnn_gravity, MLP
-from integrators import LieGroupVaritationalIntegrator
+from utils.integrators import LieGroupVaritationalIntegrator
 from utils.general import setup_reproducibility
 
 # Training functions
@@ -129,7 +129,7 @@ def run_experiment(args):
     device = torch.device(args.gpu_id if torch.cuda.is_available() else "cpu")
 
     # Initialize potential energy function as an MLP
-    V_learned = MLP(args.V_in_dim, args.V_hidden_dim, args.V_out_dim)
+    V_learned = MLP(args.V_in_dims, args.V_hidden_dims, args.V_out_dims)
 
     # Initialize integrator
     lgvi_integrator = LieGroupVaritationalIntegrator()
