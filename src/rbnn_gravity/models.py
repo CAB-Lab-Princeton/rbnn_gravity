@@ -45,7 +45,7 @@ class rbnn_gravity(nn.Module):
     super().__init__()
     self.integrator = integrator
     self.tau = tau
-    self.dt =dt
+    self.dt = dt
 
     self.V = MLP(in_dim, hidden_dim, out_dim) if V is None else V
 
@@ -64,22 +64,27 @@ class rbnn_gravity(nn.Module):
     moi = pd_matrix(diag=self.I_diag, off_diag=self.I_off_diag)
     return moi
   
-  def forward(self, R_seq: torch.Tensor, pi_seq: torch.Tensor, seq_len: int = 100):
+  def forward(self, R_seq: torch.Tensor, omega_seq: torch.Tensor, seq_len: int = 100):
     """
     ...
 
     """
-    # Calculate moment-of-inertia tensor
+    # Calculate moment-of-inertia tensor and pi_seq
     moi = self.calc_moi()
+    pi_seq = torch.einsum('ij, btjk -> btik', moi, omega_seq)
 
     # Grab initial conditions
     R_init = R_seq[:, 0, ...][:, None, ...]
     pi_init = pi_seq[:, 0, ...][:, None, ...]
 
     # Integrate full trajectory
-    R_pred, pi_pred = self.integrator.integrate(pi_init=pi_init, R_init=R_init, moi=moi, timestep=self.dt, traj_len=seq_len)
+    R_pred, pi_pred = self.integrator.integrate(pi_init=pi_init, R_init=R_init, V=self.V, moi=moi, timestep=self.dt, traj_len=seq_len)
 
-    return R_pred, pi_pred
+    # Calc omega_pred
+    moi_inv = torch.linalg.inv(moi)
+    omega_pred = torch.einsum('ij, btjk -> btik', moi_inv, pi_pred)
+
+    return R_pred, omega_pred
 
 # RBNN with gravity - High Dimensional
 class HD_RBNN_gravity(rbnn_gravity):
