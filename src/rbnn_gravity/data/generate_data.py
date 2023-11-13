@@ -127,12 +127,13 @@ def main():
     V_gravity = lambda R: build_V_gravity(m=args.mass, g=g, e_3=e_3, R=R, rho_gt=rho_gt)
 
     # Integrator
-    integrator = LieGroupVaritationalIntegrator(moi=moi, V=V_gravity)
+    integrator = LieGroupVaritationalIntegrator()
 
     # Random sampling ICs + integrating
     print(f'\n Generating dataset -- n_samples:{args.n_examples} --traj_len:{args.traj_len} \n')
 
     data_R, data_pi = generate_lowdim_dataset(MOI=moi, 
+                            V=V_gravity,
                             radius=args.radius, 
                             n_samples=args.n_examples, 
                             integrator=integrator,
