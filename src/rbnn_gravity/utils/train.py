@@ -27,7 +27,7 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
     for _, data in enumerate(dataloader):
         # Extract data
         data_R, data_omega = data
-        
+       
         # Check requires_grad -- for autograd/backprop
         if not data_R.requires_grad:
             data_R.requires_grad = True
@@ -49,7 +49,7 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
 
         # Backpropagation
         optimizer.zero_grad(set_to_none=True)
-        loss.backward()
+        loss.backward(retain_graph=True)
         optimizer.step()
 
         # Append loss
@@ -136,7 +136,7 @@ def run_experiment(args):
 
     # Initialize model and optimizer
     model = rbnn_gravity(integrator=lgvi_integrator,
-                        in_dim=args.V_in_dim,
+                        in_dim=args.V_in_dims,
                         hidden_dim=args.V_hidden_dims,
                         out_dim=args.V_out_dims,
                         tau=args.tau, 
@@ -145,6 +145,7 @@ def run_experiment(args):
                         I_off_diag=args.moi_off_diag, 
                         V=V_learned)
     model.to(device)
+    model.device = device
 
     # Create dataloaders
     print('\n Building the dataloaders ... \n')
@@ -180,8 +181,8 @@ def save_experiment(args, model, optimizer, loss):
     checkpoint = {
             'epoch': args.n_epochs,
             'model_state_dict': model.state_dict(),
-            'moi_inv_diag': model.moi_inv_diag,
-            'moi_inv_off_diag': model.moi_inv_off_diag,
+            'moi_inv_diag': model.I_diag,
+            'moi_inv_off_diag': model.I_off_diag,
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss
             }

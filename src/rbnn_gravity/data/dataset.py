@@ -32,6 +32,7 @@ class LowDimDataset(Dataset):
     """
     def __init__(self, data_dir, seq_len: int = 2):
         self.data_dir = data_dir
+        #import pdb; pdb.set_trace()
         filename = glob.glob(os.path.join(self.data_dir, "*.npz"))[0]
         self.seq_len = seq_len
 
@@ -47,7 +48,7 @@ class LowDimDataset(Dataset):
         ...
         
         """
-        num_traj, traj_len, _  = self.data_R.shape
+        num_traj, traj_len, _, _  = self.data_R.shape
         num_samples = num_traj * (traj_len - self.seq_len + 1)
         
         return num_samples
@@ -73,7 +74,7 @@ class LowDimDataset(Dataset):
         
         """
         assert idx < self.__len__(), "Index is out of range."
-        _, traj_len, _  = self.data_R.shape
+        _, traj_len, _, _  = self.data_R.shape
         
         traj_idx, seq_idx = divmod(idx, traj_len - self.seq_len + 1)
         sample_R = self.data_R[traj_idx, seq_idx:seq_idx+self.seq_len, ...]

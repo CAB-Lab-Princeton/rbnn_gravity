@@ -30,8 +30,10 @@ class LieGroupVaritationalIntegrator():
         bs, _, _ = R.shape
 
         # Calc V(q)
+        if not R.requires_grad:
+            R.requires_grad = True
+        
         q = R.reshape(bs, 9)
-        q.requires_grad = True
         V_q = V(q)
 
         # Calc gradient 
