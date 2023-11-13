@@ -87,7 +87,7 @@ def sample_init_conds(MOI: np.ndarray, radius: float, seed: int = 0, ic_type: st
     samples = np.concatenate((x, y, z), axis=-1)
     return samples
 
-def generate_lowdim_dataset(MOI: np.ndarray, radius: float, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, bandwidth_us: float = 5., desired_samples: np.ndarray = None, ic_type: str = 'random', seed: int = 0) -> np.ndarray:
+def generate_lowdim_dataset(MOI: np.ndarray, radius: float, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, bandwidth_us: float = 5., desired_samples: np.ndarray = None, ic_type: str = 'random', V = None, seed: int = 0) -> np.ndarray:
     """"""
     # sample initial conditions 
     # body angular momentum sphere
@@ -98,7 +98,7 @@ def generate_lowdim_dataset(MOI: np.ndarray, radius: float, n_samples: int, inte
     R_samples = random_group_matrices(n=n_samples)
     
     # integrate trajectories
-    data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, R_init=R_samples, timestep=timestep, traj_len=traj_len)
+    data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples, timestep=timestep, traj_len=traj_len)
     return data_R, data_pi
 
 
