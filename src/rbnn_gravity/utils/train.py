@@ -118,7 +118,7 @@ def train(args, model, traindataloader, loss_fcn):
     return training_loss, optim
         
 # Auxilary function for experiments
-def run_experiment(args, save_model: bool = True, retrain_model: bool = False):
+def run_experiment(args):
     """
     """
     # Set up reproducibility
@@ -154,7 +154,7 @@ def run_experiment(args, save_model: bool = True, retrain_model: bool = False):
     loss = low_dim_loss
 
     # Retrain model
-    if retrain_model:
+    if args.retrain_model:
         args.save_dir = args.save_dir[:-4] + "-retrain.pth"
         print(f'\n New save directory for re-trained model: {args.save_dir} ... \n')
 
@@ -163,7 +163,7 @@ def run_experiment(args, save_model: bool = True, retrain_model: bool = False):
     train_loss, optim = train(args=args, model=model, traindataloader=train_dataloader, loss_fcn=loss)
 
     # Save model
-    if save_model:
+    if args.save_model:
         print(f'\n Saving experiment {args.exp_name} from date {args.date} ... \n')
         save_experiment(args=args, model=model, optimizer=optim, loss=train_loss)    
     
