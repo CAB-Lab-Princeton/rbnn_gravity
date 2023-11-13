@@ -55,6 +55,13 @@ def get_args():
         required=True
     )
     parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=16,
+        help="Set learning rate",
+        required=True
+    )
+    parser.add_argument(
         "--lr",
         type=float,
         default=1e-3,
@@ -74,6 +81,12 @@ def get_args():
         default=2,
         help="Set input time horizon",
         required=True
+    )
+    parser.add_argument(
+        "--seq_len",
+        type=int,
+        default=10,
+        help="Set sequence length"
     )
     parser.add_argument(
         "--moi_diag",
