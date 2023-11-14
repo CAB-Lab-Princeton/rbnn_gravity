@@ -21,23 +21,21 @@ def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--gpuid",
-        type=int,
-        default=0,
-        help="The default GPU ID to use. Set -1 to use cpu.",
-    )
-    parser.add_argument("--ngpu", type=int, default=1, help="Number of gpus to use")
-
-    parser.add_argument(
-        "--data_save_dir",
-        type=str,
-        help="set directory where data is saved",
-        required=True,
-    )
-    parser.add_argument(
         "--name",
         type=str,
         help="set filename",
+        required=True,
+    )
+    parser.add_argument(
+        "--date",
+        type=str,
+        help="set date",
+        required=True,
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        help="set directory where data is saved",
         required=True,
     )
     parser.add_argument(
@@ -145,9 +143,10 @@ def main():
     # Convert to omega, numpy, and save
     moi_inv = torch.linalg.inv(moi)
     data_omega = torch.einsum('ij, btj -> bti', moi_inv, data_pi)
+    name = args.name + "-n_examples-" + str(args.n_examples)
 
-    print(f'\n Saving generated dataset in directory: {args.data_save_dir} \n')
-    save_data(data_R=data_R, data_omega=data_omega, filename=args.name, save_dir=args.data_save_dir)
+    print(f'\n Saving generated dataset in directory: {args.save_dir} \n')
+    save_data(data_R=data_R, data_omega=data_omega, filename=name, date=args.date, save_dir=args.save_dir)
 
 if __name__ == "__main__":
     main()
