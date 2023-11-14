@@ -127,7 +127,7 @@ def random_group_matrices(n, dtype=torch.float32, device=None):
     return quaternions_to_group_matrix(random_quaternions(n, dtype, device))
 
 # Functions to save generated
-def save_data(data_R: np.ndarray, data_omega: np.ndarray, filename: str, save_dir: str = '/home/jmason/rbnn_gravity/src/rbnn_gravity/data'):
+def save_data(data_R: np.ndarray, data_omega: np.ndarray, filename: str, date: str, save_dir: str = '/home/jmason/rbnn_gravity/src/rbnn_gravity/data'):
     """
     Function to save data file.
 
@@ -141,7 +141,9 @@ def save_data(data_R: np.ndarray, data_omega: np.ndarray, filename: str, save_di
     else:
         print('\n Save directory already exists! Yay! \n')
     
-    print(f'\n Now saving data as {save_dir + "/" + filename + ".npz"} ... \n')
+    print(f'\n Now saving data as {save_dir + "/" + filename + "-date-" + date + ".npz"} ... \n')
     with open(save_dir + f'/{filename}.npz', 'wb') as outfile:
+        data_R = data_R.detach().numpy()
+        data_omega = data_omega.detach().numpy()
         np.savez(outfile, R=data_R, omega=data_omega)
 
