@@ -1,0 +1,1 @@
+python data/generate_data.py --name 'test' --data_save_dir 'src/rbnn_gravity/data/test_folder' --n_examples 10 --moi_diag_gt 3. 2. 1. --moi_off_diag_gt 0. 0. 0.python src/rbnn_gravity/
