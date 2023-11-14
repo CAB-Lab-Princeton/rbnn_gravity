@@ -113,7 +113,7 @@ def train(args, model, traindataloader, loss_fcn):
         training_loss += epoch_loss
 
         if epoch % args.print_every == 0:
-            print(f'\n Epoch Number: {epoch + 1} ; Training Loss{training_loss[-1]:.4e} \n')
+            print(f'\n Epoch Number: {epoch + 1} ; Training Loss: {training_loss[-1]:.4e} \n')
     
     return training_loss, optim
         
