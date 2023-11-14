@@ -37,7 +37,7 @@ class LieGroupVaritationalIntegrator():
         V_q = V(q)
 
         # Calc gradient 
-        dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
+        dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True, retain_graph=True)[0]
         dV = dV.reshape(bs, 3, 3)
 
         # Calc skew(M) and extract M
