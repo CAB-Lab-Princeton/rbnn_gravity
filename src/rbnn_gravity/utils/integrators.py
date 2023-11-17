@@ -15,7 +15,7 @@ class LieGroupVaritationalIntegrator():
         
     def skew(self, v: torch.Tensor):
         
-        S = torch.zeros([v.shape[0], 3, 3])
+        S = torch.zeros([v.shape[0], 3, 3], device=v.device)
         S[:, 0, 1] = -v[..., 2]
         S[:, 1, 0] = v[..., 2]
         S[:, 0, 2] = v[..., 1]
@@ -37,7 +37,7 @@ class LieGroupVaritationalIntegrator():
         V_q = V(q)
 
         # Calc gradient 
-        dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True, retain_graph=True)[0]
+        dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True)[0] # create_graph=True needs to be added
         dV = dV.reshape(bs, 3, 3)
 
         # Calc skew(M) and extract M
@@ -48,7 +48,7 @@ class LieGroupVaritationalIntegrator():
     def cayley_transx(self, fc: torch.Tensor):
         """
         """
-        F = torch.einsum('bij, bjk -> bik', (torch.eye(3) + self.skew(fc)), torch.linalg.inv(torch.eye(3) - self.skew(fc)))
+        F = torch.einsum('bij, bjk -> bik', (torch.eye(3, device=fc.device) + self.skew(fc)), torch.linalg.inv(torch.eye(3, device=fc.device) - self.skew(fc)))
         return F
     
     def calc_fc_init(self, a_vec: torch.Tensor, moi:torch.Tensor) -> torch.Tensor:
@@ -67,7 +67,7 @@ class LieGroupVaritationalIntegrator():
     def calc_grad_Ac(self, a_vec: torch.Tensor, moi: torch.Tensor, fc: torch.Tensor) -> torch.Tensor:
         """
         """
-        grad_Ac = self.skew(a_vec) + torch.einsum('b, bij -> bij', torch.einsum('bi, bi -> b', a_vec, fc), torch.unsqueeze(torch.eye(3), 0).repeat(fc.shape[0], 1, 1)) + torch.einsum('bi, bj -> bij', fc, a_vec) - (2 * moi)
+        grad_Ac = self.skew(a_vec) + torch.einsum('b, bij -> bij', torch.einsum('bi, bi -> b', a_vec, fc), torch.unsqueeze(torch.eye(3, device=a_vec.device), 0).repeat(fc.shape[0], 1, 1)) + torch.einsum('bi, bj -> bij', fc, a_vec) - (2 * moi)
         return grad_Ac
     
     def optimize_fc(self, R_vec: torch.Tensor, pi_vec: torch.Tensor, moi: torch.Tensor, V, fc_list: list = [], timestep: float = 1e-3, max_iter: int = 1000, tol: float = 1e-3) -> list:

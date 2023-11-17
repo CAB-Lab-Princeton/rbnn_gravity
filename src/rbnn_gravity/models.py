@@ -62,7 +62,7 @@ class rbnn_gravity(nn.Module):
 
     """
     # Calculate moment-of-inertia matrix as a symmetric postive definite matrix 
-    moi = pd_matrix(diag=self.I_diag, off_diag=self.I_off_diag)
+    moi = pd_matrix(diag=self.I_diag, off_diag=self.I_off_diag).to(self.device)
     return moi
   
   def forward(self, R_seq: torch.Tensor, omega_seq: torch.Tensor, seq_len: int = 100):

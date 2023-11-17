@@ -36,9 +36,9 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
             data_omega.requires_grad = True
 
         # Load data onto device
-        data_R.to(model.device)
-        data_omega.to(model.device)
-        
+        data_R = data_R.to(model.device)
+        data_omega = data_omega.to(model.device)
+
         # Data should be dtype float
         data_R.type(torch.float)
         data_omega.type(torch.float)
@@ -49,7 +49,7 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
 
         # Backpropagation
         optimizer.zero_grad(set_to_none=True)
-        loss.backward(retain_graph=True)
+        loss.backward() # retain_graph=True)
         optimizer.step()
 
         # Append loss
@@ -126,8 +126,8 @@ def run_experiment(args):
     setup_reproducibility(seed=args.seed)
 
     # Set up GPU
-    device = torch.device(args.gpu_id if torch.cuda.is_available() else "cpu")
-
+    device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else "cpu")
+    
     # Initialize potential energy function as an MLP
     V_learned = MLP(args.V_in_dims, args.V_hidden_dims, args.V_out_dims)
 
@@ -160,7 +160,7 @@ def run_experiment(args):
         print(f'\n New save directory for re-trained model: {args.save_dir} ... \n')
 
     # Train model
-    print(f'\n Training model ... \n')
+    print(f'\n Training model on device ({device}) ... \n')
     train_loss, optim = train(args=args, model=model, traindataloader=train_dataloader, loss_fcn=loss)
 
     # Save model
