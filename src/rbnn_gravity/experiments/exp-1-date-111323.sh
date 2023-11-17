@@ -1,10 +1,10 @@
-CUDA_VISIBLE_DEVICE=0 python src/rbnn_gravity/run.py --exp_name='exp-1'\
+python src/rbnn_gravity/run.py --exp_name='exp-1'\
                                     --date='111323'\
                                     --data_dir='src/rbnn_gravity/data/generated_datasets/'\
                                     --save_dir='src/rbnn_gravity/saved_models/'\
                                     --gpu_id=0\
                                     --seed=0\
-                                    --n_epochs=1000\
+                                    --n_epochs=100\
                                     --seq_len=2\
                                     --batch_size=16\
                                     --lr=1e-3\
@@ -14,6 +14,6 @@ CUDA_VISIBLE_DEVICE=0 python src/rbnn_gravity/run.py --exp_name='exp-1'\
                                     --V_hidden_dim=15\
                                     --V_out_dim=1\
                                     --lambda_loss 1. 1.\
-                                    --print_every=100\
+                                    --print_every=1\
                                     --retrain_model\
                                     --save_model\
