@@ -135,72 +135,72 @@ class LieGroupVaritationalIntegrator():
         pi_traj = torch.stack(pi_list, axis=1)
         return R_traj, pi_traj
     
-    class Harsh_LGVI():
-        def __init__(self):
-           super().__init__()
+class Harsh_LGVI():
+    def __init__(self):
+        super().__init__()
 
-        def step(self, R: torch.Tensor, omega: torch.Tensor, moi: torch.Tensor):
-            """"""
-            I33 = torch.eye(3, dtype=torch.float32, device=R.device)
-            moi_inv = torch.linalg.inv(moi)
-            alpha = 0.5
+    def step(self, R: torch.Tensor, omega: torch.Tensor, moi: torch.Tensor):
+        """"""
+        I33 = torch.eye(3, dtype=torch.float32, device=R.device)
+        moi_inv = torch.linalg.inv(moi)
+        alpha = 0.5
 
-            p = torch.einsum('ij, bj', moi, omega)
-            M = self.explicit_update(R)
+        p = torch.einsum('ij, bj', moi, omega)
+        M = self.explicit_update(R)
 
-            newton_step = 5
-            a = self.dt * p + self.dt**2 * M * (1 - alpha)
-            # print(p.shape, M.shape, a.shape)
-            f = torch.zeros_like(a, dtype=torch.float32)
-            # import pdb; pdb.set_trace()
-            for i in range(newton_step):
-                aTf = torch.dot(a, f)
-                phi = a + torch.cross(a, f) + f * aTf - 2 * torch.mv(self.I, f)
-                # print(phi.shape)
-                dphi = hat_map(a, requires_grad=False) + aTf * I33 - 2 * self.I + torch.outer(f, a)
-                # print(dphi.shape)
-                dphi_inv = torch.inverse(dphi)
-                f = f - torch.mv(dphi_inv, phi)
-                # print(f.shape)
+        newton_step = 5
+        a = self.dt * p + self.dt**2 * M * (1 - alpha)
+        # print(p.shape, M.shape, a.shape)
+        f = torch.zeros_like(a, dtype=torch.float32)
+        # import pdb; pdb.set_trace()
+        for i in range(newton_step):
+            aTf = torch.dot(a, f)
+            phi = a + torch.cross(a, f) + f * aTf - 2 * torch.mv(self.I, f)
+            # print(phi.shape)
+            dphi = hat_map(a, requires_grad=False) + aTf * I33 - 2 * self.I + torch.outer(f, a)
+            # print(dphi.shape)
+            dphi_inv = torch.inverse(dphi)
+            f = f - torch.mv(dphi_inv, phi)
+            # print(f.shape)
 
-            # Need to import hat_map and vee_map 
-            F = torch.matmul((I33 + hat_map(f)), torch.inverse((I33 - hat_map(f))))
-            Ft = torch.transpose(F, 0, 1)
-            R_next = torch.matmul(R,F)
-            # print(torch.matmul(R_next,torch.transpose(R_next,0,1)))
+        # Need to import hat_map and vee_map 
+        F = torch.matmul((I33 + hat_map(f)), torch.inverse((I33 - hat_map(f))))
+        Ft = torch.transpose(F, 0, 1)
+        R_next = torch.matmul(R,F)
+        # print(torch.matmul(R_next,torch.transpose(R_next,0,1)))
 
-            # Write out the full explicit update for omega_next using the equation on overleaf
-            M_next = self.explicit_update(R_next)
-            p_next = torch.mv(Ft, p) + alpha * self.dt * torch.mv(Ft, M) + (1 - alpha) * self.dt * M_next
-            omega_next = torch.mv(moi_inv, p_next)
+        # Write out the full explicit update for omega_next using the equation on overleaf
+        M_next = self.explicit_update(R_next)
+        p_next = torch.mv(Ft, p) + alpha * self.dt * torch.mv(Ft, M) + (1 - alpha) * self.dt * M_next
+        omega_next = torch.mv(moi_inv, p_next)
 
-            return R_next, omega_next
+        return R_next, omega_next
 
-        def explicit_update(self, R: torch.Tensor):
-            """"""
-            q = torch.flatten(R, start_dim=-3) # [bs, 9] 
-            V_q = self.V(q) 
-            dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
-            dV = dV.view(-1, 3, 3)
-            SM = torch.matmul(torch.transpose(dV, -1, -2), R) - torch.matmul(torch.transpose(R, -1, -2), dV)
-            M = torch.stack((SM[:, 2, 1], SM[:, 0, 2], SM[:, 1, 0]), dim=-2)
-            
-            return M
+    def explicit_update(self, R: torch.Tensor):
+        """"""
+        q = torch.flatten(R, start_dim=-3) # [bs, 9] 
+        V_q = self.V(q) 
+        dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
+        dV = dV.view(-1, 3, 3)
+        SM = torch.matmul(torch.transpose(dV, -1, -2), R) - torch.matmul(torch.transpose(R, -1, -2), dV)
+        M = torch.stack((SM[:, 2, 1], SM[:, 0, 2], SM[:, 1, 0]), dim=-2)
         
-        def integrate(self, R: torch.Tensor, omega: torch.Tensor, moi: torch.Tensor, seq_len: int = 2):
-                """"""
-                output_R = [R]
-                output_omega = [omega]
+        return M
+    
+    def integrate(self, R: torch.Tensor, omega: torch.Tensor, moi: torch.Tensor, seq_len: int = 2):
+            """"""
+            output_R = [R]
+            output_omega = [omega]
 
-                for step in range(1, seq_len):
-                    R_i = output_R[-1]
-                    omega_i = output_omega[-1]
+            for step in range(1, seq_len):
+                R_i = output_R[-1]
+                omega_i = output_omega[-1]
 
-                    R_ii, omega_ii = self.step(R=R_i, omega=omega_i, moi=moi)
-                    output_R.append(R_ii)
-                    output_omega.append(omega_ii)
+                R_ii, omega_ii = self.step(R=R_i, omega=omega_i, moi=moi)
+                output_R.append(R_ii)
+                output_omega.append(omega_ii)
 
-                R_traj = torch.stack(output_R, axis=1)
-                omega_traj = torch.stack(output_omega, axis=1) 
-                return R_traj, omega_traj
-        
+            R_traj = torch.stack(output_R, axis=1)
+            omega_traj = torch.stack(output_omega, axis=1) 
+            return R_traj, omega_traj
+    
