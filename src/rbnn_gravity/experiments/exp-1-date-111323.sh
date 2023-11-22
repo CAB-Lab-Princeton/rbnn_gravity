@@ -11,7 +11,7 @@ python src/rbnn_gravity/run.py --exp_name='exp-1'\
                                     --dt=1e-3\
                                     --tau=2\
                                     --V_in_dim=9\
-                                    --V_hidden_dim=15\
+                                    --V_hidden_dim=50\
                                     --V_out_dim=1\
                                     --lambda_loss 1. 1.\
                                     --print_every=1\
