@@ -9,7 +9,7 @@ import torch
 
 from data.dataset import build_dataloader
 from models import rbnn_gravity, MLP
-from utils.integrators import LieGroupVaritationalIntegrator
+from utils.integrators import LieGroupVaritationalIntegrator, Harsh_LGVI
 from utils.general import setup_reproducibility
 
 # Training functions
@@ -132,7 +132,7 @@ def run_experiment(args):
     V_learned = MLP(args.V_in_dims, args.V_hidden_dims, args.V_out_dims)
 
     # Initialize integrator
-    lgvi_integrator = LieGroupVaritationalIntegrator()
+    lgvi_integrator = Harsh_LGVI() # LieGroupVaritationalIntegrator()
 
     # Initialize model and optimizer
     model = rbnn_gravity(integrator=lgvi_integrator,
