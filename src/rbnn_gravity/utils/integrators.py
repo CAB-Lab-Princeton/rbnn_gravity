@@ -139,68 +139,80 @@ class Harsh_LGVI():
     def __init__(self):
         super().__init__()
 
-    def step(self, R: torch.Tensor, omega: torch.Tensor, moi: torch.Tensor):
+    def hat_map(self, v: torch.Tensor, requires_grad: bool = False):
+        S = torch.zeros([v.shape[0], 3, 3], requires_grad=requires_grad, device=v.device)
+        S[:, 0, 1] = -v[..., 2]
+        S[:, 1, 0] = v[..., 2]
+        S[:, 0, 2] = v[..., 1]
+        S[:, 2, 0] = -v[..., 1]
+        S[:, 1, 2] = -v[..., 0]
+        S[:, 2, 1] = v[..., 0]
+
+        return S
+    
+    def step(self, R: torch.Tensor, pi: torch.Tensor, moi: torch.Tensor, V, timestep: float):
         """"""
         I33 = torch.eye(3, dtype=torch.float32, device=R.device)
         moi_inv = torch.linalg.inv(moi)
         alpha = 0.5
+        dt = timestep
 
-        p = torch.einsum('ij, bj', moi, omega)
-        M = self.explicit_update(R)
+        p = pi
+        M = self.explicit_update(R=R, V=V)
 
         newton_step = 5
-        a = self.dt * p + self.dt**2 * M * (1 - alpha)
+        a = dt * p + dt**2 * M * (1 - alpha)
         # print(p.shape, M.shape, a.shape)
         f = torch.zeros_like(a, dtype=torch.float32)
         # import pdb; pdb.set_trace()
         for i in range(newton_step):
-            aTf = torch.dot(a, f)
-            phi = a + torch.cross(a, f) + f * aTf - 2 * torch.mv(self.I, f)
+            aTf = torch.bmm(a.view(-1, 1, 3), f.view(-1, 3, 1)).squeeze() # torch.dot(a, f)
+            phi = a + torch.cross(a, f, dim=-1) + torch.einsum('bi, b -> bi', f, aTf) - 2 * torch.einsum('ij, bj -> bi', moi, f) # torch.mv(moi, f)
             # print(phi.shape)
-            dphi = hat_map(a, requires_grad=False) + aTf * I33 - 2 * self.I + torch.outer(f, a)
+            dphi = self.hat_map(v=a, requires_grad=False) + torch.einsum('b, ij -> bij', aTf, I33) - 2 * moi + torch.einsum('bi, bj ->bij', f, a) # torch.outer(f, a)
             # print(dphi.shape)
             dphi_inv = torch.inverse(dphi)
-            f = f - torch.mv(dphi_inv, phi)
+            f = f - torch.einsum('bij, bj -> bi', dphi_inv, phi)
             # print(f.shape)
 
         # Need to import hat_map and vee_map 
-        F = torch.matmul((I33 + hat_map(f)), torch.inverse((I33 - hat_map(f))))
-        Ft = torch.transpose(F, 0, 1)
-        R_next = torch.matmul(R,F)
+        F = torch.matmul((I33 + self.hat_map(f)), torch.inverse((I33 - self.hat_map(f))))
+        Ft = torch.transpose(F, 1, 2)
+        R_next = torch.matmul(R, F)
         # print(torch.matmul(R_next,torch.transpose(R_next,0,1)))
 
         # Write out the full explicit update for omega_next using the equation on overleaf
-        M_next = self.explicit_update(R_next)
-        p_next = torch.mv(Ft, p) + alpha * self.dt * torch.mv(Ft, M) + (1 - alpha) * self.dt * M_next
-        omega_next = torch.mv(moi_inv, p_next)
+        M_next = self.explicit_update(R=R_next, V=V)
+        p_next = torch.einsum('bij, bj ->bi', Ft, p) + alpha * dt * torch.einsum('bij, bj -> bi', Ft, M) + (1 - alpha) * dt * M_next
+        # omega_next = torch.mv(moi_inv, p_next)
 
-        return R_next, omega_next
+        return R_next, p_next
 
-    def explicit_update(self, R: torch.Tensor):
+    def explicit_update(self, R: torch.Tensor, V):
         """"""
-        q = torch.flatten(R, start_dim=-3) # [bs, 9] 
-        V_q = self.V(q) 
+        q = torch.flatten(R, start_dim=-2) # [bs, 9] 
+        V_q = V(q) 
         dV =  torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
         dV = dV.view(-1, 3, 3)
         SM = torch.matmul(torch.transpose(dV, -1, -2), R) - torch.matmul(torch.transpose(R, -1, -2), dV)
-        M = torch.stack((SM[:, 2, 1], SM[:, 0, 2], SM[:, 1, 0]), dim=-2)
+        M = torch.stack((SM[:, 2, 1], SM[:, 0, 2], SM[:, 1, 0]), dim=-2).transpose(1, 0)
         
         return M
     
-    def integrate(self, R: torch.Tensor, omega: torch.Tensor, moi: torch.Tensor, seq_len: int = 2):
+    def integrate(self, R_init: torch.Tensor, pi_init: torch.Tensor, moi: torch.Tensor, V, timestep, traj_len: int = 100):
             """"""
-            output_R = [R]
-            output_omega = [omega]
+            output_R = [R_init]
+            output_pi = [pi_init]
 
-            for step in range(1, seq_len):
+            for step in range(1, traj_len):
                 R_i = output_R[-1]
-                omega_i = output_omega[-1]
+                pi_i = output_pi[-1]
 
-                R_ii, omega_ii = self.step(R=R_i, omega=omega_i, moi=moi)
+                R_ii, pi_ii = self.step(R=R_i, pi=pi_i, moi=moi, V=V, timestep=timestep)
                 output_R.append(R_ii)
-                output_omega.append(omega_ii)
+                output_pi.append(pi_ii)
 
             R_traj = torch.stack(output_R, axis=1)
-            omega_traj = torch.stack(output_omega, axis=1) 
-            return R_traj, omega_traj
+            pi_traj = torch.stack(output_pi, axis=1) 
+            return R_traj, pi_traj
     
