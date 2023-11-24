@@ -22,19 +22,20 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
     # Set model to train mode
     model.train()
     epoch_loss = []
+    
+    # Set tau -- should be an input
+    tau = 1
 
     # Iterate over elements of the dataloader and train
     for _, data in enumerate(dataloader):
         # Extract data
         data_R, data_omega = data
-       
+        print(data_R.shape, data_omega.shape)
+    
         # Check requires_grad -- for autograd/backprop
         if not data_R.requires_grad:
             data_R.requires_grad = True
         
-        if not data_omega.requires_grad:
-            data_omega.requires_grad = True
-
         # Load data onto device
         data_R = data_R.to(model.device)
         data_omega = data_omega.to(model.device)
@@ -45,7 +46,7 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
 
         # Forward pass and calculate loss
         data_R_recon, data_omega_recon = model(R_seq=data_R, omega_seq=data_omega, seq_len=args.seq_len)
-        loss = loss_fcn(R_gt=data_R, R_recon=data_R_recon, omega_gt=data_omega, omega_recon=data_omega_recon, lambda_loss=args.lambda_loss)
+        loss = loss_fcn(R_gt=data_R[:, tau:, ...], R_recon=data_R_recon[:, tau:, ...], omega_gt=data_omega[:, tau:, ...], omega_recon=data_omega_recon[:, tau:, ...], lambda_loss=args.lambda_loss)
 
         # Backpropagation
         optimizer.zero_grad(set_to_none=True)
@@ -132,7 +133,7 @@ def run_experiment(args):
     V_learned = MLP(args.V_in_dims, args.V_hidden_dims, args.V_out_dims)
 
     # Initialize integrator
-    lgvi_integrator = Harsh_LGVI() # LieGroupVaritationalIntegrator()
+    lgvi_integrator = LieGroupVaritationalIntegrator() # Harsh_LGVI()
 
     # Initialize model and optimizer
     model = rbnn_gravity(integrator=lgvi_integrator,
