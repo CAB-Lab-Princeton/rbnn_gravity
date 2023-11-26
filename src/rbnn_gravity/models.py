@@ -50,11 +50,9 @@ class rbnn_gravity(nn.Module):
 
     self.V = MLP(in_dim, hidden_dim, out_dim) if V is None else V
 
-    # Moment-of-inertia tensor -- assert that requires_grad is on for learning
-    self.I_diag = torch.rand(3, requires_grad=True) / np.sqrt(3) if I_diag is None else I_diag
-    self.I_off_diag = torch.rand(3, requires_grad=True) / np.sqrt(3) if I_off_diag is None else I_off_diag
-
-    assert self.I_diag.requires_grad == True and self.I_off_diag.requires_grad == True
+    # Moment-of-inertia tensor
+    self.I_diag = torch.nn.Parameter(torch.rand(3) / np.sqrt(3), requires_grad=True) if I_diag is None else I_diag
+    self.I_off_diag = torch.nn.Parameter(torch.rand(3) / np.sqrt(3), requires_grad=True) if I_off_diag is None else I_off_diag
 
   def calc_moi(self):
     """
