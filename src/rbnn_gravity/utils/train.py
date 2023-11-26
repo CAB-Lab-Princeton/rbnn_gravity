@@ -6,6 +6,7 @@ import sys, os
 
 import numpy as np
 import torch
+import time
 
 from data.dataset import build_dataloader
 from models import rbnn_gravity, MLP
@@ -20,17 +21,15 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
     ...
     """
     # Set model to train mode
-    model.train()
     epoch_loss = []
     
     # Set tau -- should be an input
-    tau = 1
+    tau = 1 # equals 1 for low dimension
 
     # Iterate over elements of the dataloader and train
-    for _, data in enumerate(dataloader):
+    for idx, data in enumerate(dataloader):
         # Extract data
         data_R, data_omega = data
-        print(data_R.shape, data_omega.shape)
     
         # Check requires_grad -- for autograd/backprop
         if not data_R.requires_grad:
@@ -54,7 +53,9 @@ def train_epoch(args, model, dataloader, optimizer, loss_fcn):
         optimizer.step()
 
         # Append loss
-        epoch_loss.append(loss.item())
+        if idx % args.print_every == 0:
+            batch_loss = loss.item()
+            epoch_loss.append(batch_loss)
     
     return epoch_loss
 
@@ -162,7 +163,11 @@ def run_experiment(args):
 
     # Train model
     print(f'\n Training model on device ({device}) ... \n')
+    t0 = time.time()
     train_loss, optim = train(args=args, model=model, traindataloader=train_dataloader, loss_fcn=loss)
+    
+    train_time = time.time() - t0
+    print(f'\n Training time: {train_time} \n')
 
     # Save model
     if args.save_model:
@@ -182,8 +187,8 @@ def save_experiment(args, model, optimizer, loss):
     checkpoint = {
             'epoch': args.n_epochs,
             'model_state_dict': model.state_dict(),
-            'moi_inv_diag': model.I_diag,
-            'moi_inv_off_diag': model.I_off_diag,
+            'moi_diag': model.I_diag,
+            'moi_off_diag': model.I_off_diag,
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss
             }
