@@ -161,6 +161,9 @@ cython_debug/
 
 # setuptools-scm managed version file
 src/hgan/_version.py
-src/rbnn_gravity/saved_models/*.pdf
-src/rbnn_gravity/experiments/*.sh
-src/rbnn_gravity/saved_models/*.pth
+src/rbnn_gravity/low_dim/saved_models/*.pdf
+src/rbnn_gravity/low_dim/experiments/*.sh
+src/rbnn_gravity/low_dim/saved_models/*.pth
+src/rbnn_gravity/high_dim/saved_models/*.pdf
+src/rbnn_gravity/high_dim/experiments/*.sh
+src/rbnn_gravity/high_dim/saved_models/*.pth
