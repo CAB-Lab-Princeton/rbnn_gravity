@@ -6,7 +6,7 @@
 import sys, os
 import torch
 from torch import nn
-from rbnn_gravity.utils.math import *
+from utils.math import *
 
 # Todo: 
 #   - Get rid of the maxpooling layers
@@ -22,7 +22,7 @@ class EncoderRBNN(nn.Module):
     """
     def __init__(self,
                 in_channels: int = 3,
-                obs_len: int = 2,
+                obs_len: int = 1,
                 latent_dim = 9) -> None:
         """
         Parameters
@@ -209,9 +209,9 @@ class EncoderRBNN_gravity(nn.Module):
     """
     def __init__(self,
                 in_channels: int = 3,
-                obs_len: int = 2,
-                latent_dim: int  = 9,
-                nonlinearity = torch.nn.GELU) -> None:
+                obs_len: int = 1,
+                latent_dim: int  = 6,
+                nonlinearity = torch.nn.GELU()) -> None:
         """
         Parameters
         ----------
@@ -306,8 +306,8 @@ class DecoderRBNN_gravity(nn.Module):
     
     """
     def __init__(self,
-                in_channels: int = 9,
-                nonlinearity = torch.nn.GELU) -> None:
+                in_channels: int = 6,
+                nonlinearity = torch.nn.GELU()) -> None:
         """
         Parameters
         ----------
@@ -357,7 +357,7 @@ class DecoderRBNN_gravity(nn.Module):
         
         """
         # assert torch.any(x.isnan()) == False and torch.any(x.isinf()) == False
-        x_ = x.reshape(-1, 9)
+        x_ = x[:, :2, ...].reshape(-1, 6)
         
         h7 = self.linear7(x_)
         h6 = self.linear6(self.nonlin(h7))
