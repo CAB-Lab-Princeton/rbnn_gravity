@@ -84,6 +84,60 @@ class LowDimDataset(Dataset):
         
         return sample
 
+# Image data class
+class RBNNdataset(Dataset):
+    """
+    Dataset class for the DEVS project.
+    
+    ...
+    
+    Attributes
+    ----------
+    data : torch.Tensor
+        N-D array of images for training/testing.
+        
+    seq_len : int, default=3
+        Number of observations representating a sequence of images -- input to the network.
+        
+        
+    Methods
+    -------
+    __len__()
+    __getitem__()
+    
+    Notes
+    -----
+    
+    """
+    def __init__(self, data_dir: np.ndarray, seq_len: int = 3):
+        super().__init__()
+
+        # Import data from file
+        data = np.load(data_dir, allow_pickle=True)
+
+        self.data = data
+        self.seq_len = seq_len
+        
+    def __len__(self):
+        """
+        """
+        num_traj, traj_len, _, _, _ = self.data.shape
+        length = num_traj * (traj_len - self.seq_len + 1)
+            
+        return length
+        
+    def __getitem__(self, idx):
+        """
+        """
+        assert idx < self.__len__(),  "Index is out of range."
+        num_traj, traj_len, _, _, _ = self.data.shape
+        
+        traj_idx, seq_idx = divmod(idx, traj_len - self.seq_len + 1)
+        
+        sample = self.data[traj_idx, seq_idx:seq_idx+self.seq_len,...]
+        
+        return sample
+    
 # Auxiliary functions
 def build_dataloader(args):
     """
@@ -113,6 +167,35 @@ def get_dataset(args):
         Dataset
     """
     return LowDimDataset(args.data_dir, args.seq_len)
+
+def build_dataloader_hd(args):
+    """
+    Wrapper to build dataloader.
+
+    ...
+
+    Args:
+        args (ArgumentParser): experiment parameters
+
+    """
+    dataset = get_dataset_hd(args)
+    dataloader = DataLoader(
+        dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True
+    )
+
+    return dataloader
+
+def get_dataset_hd(args):
+    """
+    builds a dataloader
+
+    Args:
+        args (ArgumentParser): experiment parameters
+
+    Returns:
+        Dataset
+    """
+    return RBNNdataset(args.data_dir, args.seq_len)
 
 # Archive
 class Measurement(Dataset):
