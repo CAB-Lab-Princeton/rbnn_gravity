@@ -6,7 +6,9 @@ import os
 import numpy as np
 import torch
 
-# Functions for generating datasets
+from utils.math import eazyz_to_group_matrix
+
+# Functions for generating datasets for freely rotating RBD
 def euler_eigvec(MOI: np.ndarray, radius: float) -> np.ndarray:
     """
     Function to calculate the eigenvectors of the Euler dynamics, linearized about the intermediate axis.
@@ -99,6 +101,49 @@ def generate_lowdim_dataset(MOI: np.ndarray, radius: float, n_samples: int, inte
     
     # integrate trajectories
     data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples, timestep=timestep, traj_len=traj_len)
+    return data_R, data_pi
+
+# Functions for data generation for 3D Pendulum and Physical Pendulum
+def sample_group_matrices_3DP(radius: float, ic_type: str = 'stable', n_samples: int = 100, scale: float = 0.1, specified_samples: np.ndarray = None):
+    """"""
+    ic_type = ic_type.lower()
+    eps = 1e-3
+
+    if ic_type == 'stable':
+        stable  = np.array([0., 0., 0.])[None, ...].repeat(n_samples, 1)
+        alpha = np.random.uniform(low=-scale*np.pi, high=scale*np.pi, size=(n_samples, 1)) + stable[:, 0]
+        beta = np.random.uniform(low=-0.5*scale*np.pi, high=0.5*scale*np.pi, size=(n_samples, 1)) + stable[:, 1]
+        gamma = np.random.uniform(low=-scale*np.pi, high=scale*np.pi, size=(n_samples, 1)) + stable[:, 2]
+    elif ic_type == 'unstable':
+        unstable  = np.array([0., np.pi, 0.])[None, ...].repeat(n_samples, 1)
+        alpha = np.random.uniform(low=-scale*np.pi, high=scale*np.pi, size=(n_samples, 1)) + unstable[:, 0]
+        beta = np.random.uniform(low=-0.5*scale*np.pi, high=0.5*scale*np.pi, size=(n_samples, 1)) + unstable[:, 1]
+        gamma = np.random.uniform(low=-scale*np.pi, high=scale*np.pi, size=(n_samples, 1)) + unstable[:, 2]
+    elif ic_type == 'uniform':
+        alpha = np.random.uniform(low=0.0, high=2*np.pi-eps, size=(n_samples, 1))
+        beta = np.random.uniform(low=-0.5*scale*np.pi, high=0.5*scale*np.pi, size=(n_samples, 1))
+        gamma = np.random.uniform(low=-scale*np.pi, high=scale*np.pi, size=(n_samples, 1))
+    else:
+        raise ValueError(f"Use 'ic_type' from the allowed set: {['stable', 'unstable', 'uniform']}")
+
+    R = eazyz_to_group_matrix(alpha=alpha, beta=beta, gamma=gamma).squeeze()
+    samples = R.transpose(2, 0, 1)
+
+    return samples
+
+def generate_lowdim_dataset_3DP(MOI: np.ndarray, radius: float, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, bandwidth_us: float = 5., desired_samples: np.ndarray = None, R_ic_type: str = 'stable', pi_ic_type: str = 'random', V = None, seed: int = 0):
+    """"""
+    # sample initial conditions 
+    # body angular momentum sphere
+    pi_samples = sample_init_conds(MOI=MOI, radius=radius, ic_type=pi_ic_type, n_samples=n_samples, bandwidth_us=bandwidth_us)
+    pi_samples_tensor = torch.tensor(pi_samples, device=MOI.device)
+    
+    # group element matrices
+    R_samples = sample_group_matrices_3DP(radius=radius, ic_type=R_ic_type, n_samples=n_samples)
+    R_samples_tensor = torch.tensor(R_samples, device=MOI.device, requires_grad=True)
+    
+    # integrate trajectories
+    data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples_tensor, timestep=timestep, traj_len=traj_len)
     return data_R, data_pi
 
 
