@@ -91,10 +91,16 @@ def get_args():
         help="set angular momentum sphere radius, default: 50.0",
     )
     parser.add_argument(
-        "--ic_type",
+        "--R_ic_type",
+        choices=['stable', 'unstable', 'uniform'],
+        default='stable',
+        help="set R ic type for sampling group matrices on SO(3)",
+    )
+    parser.add_argument(
+        "--pi_ic_type",
         choices=['random', 'unstable', 'desired'],
         default='random',
-        help="set angular momentum sphere radius, default: 50.0",
+        help="set pi ic types for sample angular momentum sphere",
     )
     parser.add_argument(
         "--seed", type=int, default=0, help="set random seed"
@@ -118,7 +124,7 @@ def main():
     rho_gt = torch.tensor([[0., 0., 1.]])
 
     # Initialize values
-    moi = pd_matrix(diag=torch.tensor(args.moi_diag_gt), off_diag=torch.tensor(args.moi_off_diag_gt))
+    moi = pd_matrix(diag=torch.sqrt(torch.tensor(args.moi_diag_gt)), off_diag=torch.tensor(args.moi_off_diag_gt))
     print(f'\n Ground-truth moment of inertia: \n {moi} \n')
 
     # Initialize potential function
@@ -130,14 +136,15 @@ def main():
     # Random sampling ICs + integrating
     print(f'\n Generating dataset -- n_samples:{args.n_examples} --traj_len:{args.traj_len} \n')
 
-    data_R, data_pi = generate_lowdim_dataset(MOI=moi, 
+    data_R, data_pi = generate_lowdim_dataset_3DP(MOI=moi, 
                             V=V_gravity,
                             radius=args.radius, 
                             n_samples=args.n_examples, 
                             integrator=integrator,
                             timestep=args.dt,
                             traj_len=args.traj_len,
-                            ic_type=args.ic_type,
+                            R_ic_type=args.R_ic_type,
+                            pi_ic_type=args.pi_ic_type,
                             seed=args.seed)
     
     # Convert to omega, numpy, and save
