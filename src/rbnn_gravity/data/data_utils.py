@@ -131,6 +131,18 @@ def sample_group_matrices_3DP(radius: float, ic_type: str = 'stable', n_samples:
 
     return samples
 
+def sample_group_matrix_gyroscope(n_samples: int):
+    """"""
+    # Euler angles for gyroscope
+    eulers = (np.random.rand(n_samples, 2, 3) - 0.5) * 3
+
+    # Edit euler angles to be in a desired range (?)
+    eulers[:,1,0]*=3
+    eulers[:,1,1]*=.2
+    eulers[:,1,2] = (np.random.randint(2, size=(n_samples, )).float() * 2 - 1) * (np.random.randn(n_samples) + 7) * 1.5
+
+    return eulers
+
 def generate_lowdim_dataset_3DP(MOI: np.ndarray, radius: float, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, bandwidth_us: float = 5., desired_samples: np.ndarray = None, R_ic_type: str = 'stable', pi_ic_type: str = 'random', V = None, seed: int = 0):
     """"""
     # sample initial conditions 
