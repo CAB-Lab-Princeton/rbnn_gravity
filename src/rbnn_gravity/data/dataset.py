@@ -109,11 +109,8 @@ class RBNNdataset(Dataset):
     -----
     
     """
-    def __init__(self, data_dir: np.ndarray, seq_len: int = 3):
+    def __init__(self, data: np.ndarray, seq_len: int = 3):
         super().__init__()
-
-        # Import data from file
-        data = np.load(data_dir, allow_pickle=True)
 
         self.data = data
         self.seq_len = seq_len
@@ -178,12 +175,32 @@ def build_dataloader_hd(args):
         args (ArgumentParser): experiment parameters
 
     """
-    dataset = get_dataset_hd(args)
-    dataloader = DataLoader(
-        dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True
+    # Construct datasets
+    trainds, testds, valds = get_dataset_hd(args)
+    
+    # Dataset kwargs 
+    train_kwargs = {'batch_size': args.batch_size}
+    val_kwargs = {'batch_size': args.batch_size}
+    test_kwargs = {'batch_size': args.batch_size}
+    
+    cuda_kwargs = {'num_workers': 4}
+        
+    train_kwargs.update(cuda_kwargs)
+    val_kwargs.update(cuda_kwargs)
+    test_kwargs.update(cuda_kwargs)
+
+    # Create dataloaders
+    traindataloader = DataLoader(
+        trainds, **train_kwargs, drop_last=True, shuffle=True, pin_memory=True
+    )
+    testdataloader = DataLoader(
+        testds, **test_kwargs, drop_last=True, shuffle=True, pin_memory=True
+    )
+    valdataloader = DataLoader(
+        valds, **val_kwargs, drop_last=True, shuffle=True, pin_memory=True
     )
 
-    return dataloader
+    return traindataloader, testdataloader, valdataloader
 
 def get_dataset_hd(args):
     """
@@ -195,7 +212,36 @@ def get_dataset_hd(args):
     Returns:
         Dataset
     """
-    return RBNNdataset(args.data_dir, args.seq_len)
+    # Load data from file
+    raw_data = np.load(args.data_dir, allow_pickle=True)
+
+    num_traj, traj_len, _, _, _ = raw_data.shape
+    
+    test_split = args.test_split
+    val_split = args.val_split
+    
+    test_len = int(test_split * num_traj)
+    val_len = int((1. - test_split) * val_split * num_traj)
+    train_len = int((1. - test_split) * (1. - val_split) * num_traj)
+    
+    np.random.shuffle(raw_data)
+        
+    rd_split = np.split(raw_data.astype(float), [train_len, train_len + val_len, train_len + val_len + test_len], axis=0)
+    
+    if traj_len > 100:
+        train_dataset = rd_split[0][:, :100, ...]
+        val_dataset = rd_split[1][:, :100, ...]
+        test_dataset = rd_split[2][:, :100, ...]
+    else:
+        train_dataset = rd_split[0]
+        val_dataset = rd_split[1]
+        test_dataset = rd_split[2]
+
+    trainds_rbnn = RBNNdataset(data=train_dataset, seq_len=args.seq_len)
+    testds_rbnn = RBNNdataset(data=test_dataset, seq_len=args.seq_len)
+    valds_rbnn = RBNNdataset(data=val_dataset, seq_len=args.seq_len)
+
+    return trainds_rbnn, testds_rbnn, valds_rbnn
 
 # Archive
 class Measurement(Dataset):
