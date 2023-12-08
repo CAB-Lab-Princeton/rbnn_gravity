@@ -38,7 +38,13 @@ def get_args():
     parser.add_argument(
         "--save_dir",
         type=str,
-        help="directory where trained models/checkpoints are saved",
+        help="directory where trained models are saved",
+        required=True,
+    )
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        help="directory where checkpoints are saved",
         required=True,
     )
     parser.add_argument(
@@ -96,6 +102,20 @@ def get_args():
         help="Set sequence length"
     )
     parser.add_argument(
+        "--test_split",
+        type=float,
+        default=0.2,
+        help="Test split",
+        required=False
+    )
+    parser.add_argument(
+        "--val_split",
+        type=float,
+        default=0.1,
+        help="Val split",
+        required=False
+    )
+    parser.add_argument(
         "--moi_diag",
         type=float,
         nargs="+",
@@ -139,10 +159,31 @@ def get_args():
         required=True
     )
     parser.add_argument(
+        "--patience",
+        type=int,
+        default=1,
+        help="Set patience for early stopper",
+        required=True
+    )
+    parser.add_argument(
+        "--min_delta",
+        type=float,
+        default=0,
+        help="Set min_delta for early stopper",
+        required=True
+    )
+    parser.add_argument(
         "--print_every",
         type=int,
         default=10,
         help="Print loss value every n epochs.",
+        required=True
+    )
+    parser.add_argument(
+        "--save_every",
+        type=int,
+        default=10,
+        help="Save checkpoints every n epochs.",
         required=True
     )
     parser.add_argument(
