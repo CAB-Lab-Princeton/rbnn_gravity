@@ -215,18 +215,9 @@ def get_dataset_hd(args):
     # Load data from file
     raw_data = np.load(args.data_dir, allow_pickle=True)
 
-    num_traj, traj_len, _, _, _ = raw_data.shape
-    
-    test_split = args.test_split
-    val_split = args.val_split
-    
-    test_len = int(test_split * num_traj)
-    val_len = int((1. - test_split) * val_split * num_traj)
-    train_len = int((1. - test_split) * (1. - val_split) * num_traj)
-    
-    np.random.shuffle(raw_data)
-        
-    rd_split = np.split(raw_data.astype(float), [train_len, train_len + val_len, train_len + val_len + test_len], axis=0)
+    traj_len = raw_data.shape[1]
+
+    rd_split = shuffle_and_split(raw_data=raw_data, test_split=args.test_split, val_split=args.val_split) 
     
     if traj_len > 100:
         train_dataset = rd_split[0][:, :100, ...]
@@ -259,3 +250,21 @@ class Measurement(Dataset):
 
     def __getitem__(self, idx):
         return self.R[idx:idx+2], self.omega[idx:idx+2]
+    
+# Auxilary function -- shuffle and split dataset
+def shuffle_and_split(raw_data: np.ndarray, test_split: float, val_split: float):
+    """
+    Function to shuffle and split the dataset.
+
+    ...
+    """
+    n_traj = raw_data.shape[0]
+
+    test_len = int(test_split * n_traj)
+    val_len = int((1. - test_split) * val_split * n_traj)
+    train_len = int((1. - test_split) * (1. - val_split) * n_traj)
+    
+    np.random.shuffle(raw_data)
+        
+    rd_split = np.split(raw_data.astype(float), [train_len, train_len + val_len, train_len + val_len + test_len], axis=0)
+    return rd_split
