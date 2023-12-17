@@ -2,7 +2,7 @@
 # Project: RBNN + Gravity
 # Date: 11/08/23
 
-import os
+import os, sys
 import numpy as np
 import torch
 
@@ -99,7 +99,7 @@ def generate_lowdim_dataset(MOI: np.ndarray, radius: float, n_samples: int, inte
     # group element matrices
     R_samples = random_group_matrices(n=n_samples)
     
-    # integrate trajectories
+    # Integrate trajectories
     data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples, timestep=timestep, traj_len=traj_len)
     return data_R, data_pi
 
@@ -131,17 +131,44 @@ def sample_group_matrices_3DP(radius: float, ic_type: str = 'stable', n_samples:
 
     return samples
 
-def sample_group_matrix_gyroscope(n_samples: int):
+def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int):
     """"""
     # Euler angles for gyroscope
     eulers = (np.random.rand(n_samples, 2, 3) - 0.5) * 3
 
-    # Edit euler angles to be in a desired range (?)
-    eulers[:,1,0]*=3
-    eulers[:,1,1]*=.2
-    eulers[:,1,2] = (np.random.randint(2, size=(n_samples, )).float() * 2 - 1) * (np.random.randn(n_samples) + 7) * 1.5
+    # Edit euler angles to be in a desired range (should be psidot >> thetadot >> phidot)
+    eulers[:,1,0]*=3 # thetadot [magnitude 4.5]
+    eulers[:,1,1]*=.2 # phidot [magnitude 0.3]
+    eulers[:,1,2] = (np.random.randint(2, size=(n_samples, )) * 2. - 1) * (np.random.randn(n_samples) + 7) * 1.5 # psidot [manigtude 7]
 
-    return eulers
+    # Assign euler angles
+    theta = eulers[:, 0, 0]
+    phi = eulers[:, 0, 1]
+    psi = eulers[:, 0, 2]
+
+    # Calculate omega in the body-fixed frame
+    thetadot = eulers[:, 1, 0]
+    phidot = eulers[:, 1, 1]
+    psidot = eulers[:, 1, 2]
+
+    st = np.sin(theta)
+    ct = np.cos(theta)
+
+    sp = np.sin(psi)
+    cp = np.cos(psi)
+
+    # Calculate pi in the body frame -- Goldstein 
+    w1 = (phidot * st * sp) + (thetadot * cp)
+    w2 = (phidot * st * cp) - (thetadot * sp)
+    w3 = (phidot * ct) + psidot
+
+    omega = np.stack([w1, w2, w3], axis=-1)
+    pi_samples = np.einsum('ij, bj -> bi', MOI, omega)
+
+    # Convert the Euler angles to rotation matrices using the ZYZ convention
+    R_samples = eazyz_to_group_matrix(alpha=theta, beta=phi, gamma=psi)
+
+    return R_samples, pi_samples
 
 def generate_lowdim_dataset_3DP(MOI: np.ndarray, radius: float, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, bandwidth_us: float = 5., desired_samples: np.ndarray = None, R_ic_type: str = 'stable', pi_ic_type: str = 'random', V = None, seed: int = 0):
     """"""
@@ -158,6 +185,19 @@ def generate_lowdim_dataset_3DP(MOI: np.ndarray, radius: float, n_samples: int, 
     data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples_tensor, timestep=timestep, traj_len=traj_len)
     return data_R, data_pi
 
+def generate_lowdim_dataset_gyroscope(MOI: np.ndarray, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, V = None, seed: int = 0):
+    """"""
+    # Sample initial conditions
+    R_samples, pi_samples = sample_group_matrix_gyroscope(MOI=MOI, n_samples=n_samples)
+
+    # Make samples tensors
+    R_samples_tensor = torch.tensor(R_samples, device=R_samples.device)
+    pi_samples_tensor = torch.tensor(pi_samples, device=pi_samples.device)
+
+    # Integrate trajectories
+    data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples_tensor, timestep=timestep, traj_len=traj_len)
+
+    return data_R, data_pi
 
 # Auxilary function for dataset generation
 def random_quaternions(n, dtype=torch.float32, device=None):
