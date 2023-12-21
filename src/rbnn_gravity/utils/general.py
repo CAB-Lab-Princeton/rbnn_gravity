@@ -6,6 +6,8 @@ import random
 import torch
 import numpy as np
 
+from PIL import Image
+
 
 # Reproducibility Utility Functions
 def setup_reproducibility(seed: int):
@@ -27,3 +29,9 @@ def setup_reproducibility_hd(seed: int, cnn_reprod: bool = True):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+def gen_gif(img_array: np.ndarray, save_dir: str):
+    """"""
+    imgs = [Image.fromarray((img*255).astype('uint8').transpose(1, 2, 0), mode="RGB").resize((128, 128)) for img in img_array[0, ...]]
+    # duration is the number of milliseconds between frames; this is 40 frames per second
+    imgs[0].save(save_dir, save_all=True, append_images=imgs[1:], duration=50, loop=0)
