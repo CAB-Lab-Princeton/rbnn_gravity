@@ -7,7 +7,7 @@ import numpy as np
 
 from torch import nn
 
-from utils.math import hat_map, vee_map, pd_matrix
+from utils.math_utils import hat_map, vee_map, pd_matrix
 
 # Model classes
 

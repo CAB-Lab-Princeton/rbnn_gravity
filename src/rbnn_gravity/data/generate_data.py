@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 
 from models import build_V_gravity
 from data.data_utils import *
-from utils.math import *
+from utils.math_utils import *
 from utils.general import *
 from utils.integrators import LieGroupVaritationalIntegrator
 

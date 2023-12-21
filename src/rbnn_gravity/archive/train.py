@@ -1,7 +1,7 @@
 import time
 import torch 
 from rbnn_gravity.models import RBNN
-from rbnn_gravity.utils.math import setup_reproducibility
+from rbnn_gravity.utils.math_utils import setup_reproducibility
 from rbnn_gravity.data.dataset import build_dataloader
 from rbnn_gravity.configuration import config
 

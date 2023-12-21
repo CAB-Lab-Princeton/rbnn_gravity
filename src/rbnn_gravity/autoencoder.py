@@ -6,7 +6,7 @@
 import sys, os
 import torch
 from torch import nn
-from utils.math import *
+from utils.math_utils import *
 
 # Todo: 
 #   - Get rid of the maxpooling layers

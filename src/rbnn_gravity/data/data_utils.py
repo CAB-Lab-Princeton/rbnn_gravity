@@ -6,7 +6,7 @@ import os, sys
 import numpy as np
 import torch
 
-from utils.math import eazyz_to_group_matrix
+from utils.math_utils import eazyz_to_group_matrix
 
 # Functions for generating datasets for freely rotating RBD
 def euler_eigvec(MOI: np.ndarray, radius: float) -> np.ndarray:
@@ -191,8 +191,8 @@ def generate_lowdim_dataset_gyroscope(MOI: np.ndarray, n_samples: int, integrato
     R_samples, pi_samples = sample_group_matrix_gyroscope(MOI=MOI, n_samples=n_samples)
 
     # Make samples tensors
-    R_samples_tensor = torch.tensor(R_samples, device=R_samples.device)
-    pi_samples_tensor = torch.tensor(pi_samples, device=pi_samples.device)
+    R_samples_tensor = torch.tensor(R_samples, requires_grad=True).permute(2, 0, 1)
+    pi_samples_tensor = torch.tensor(pi_samples)
 
     # Integrate trajectories
     data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples_tensor, timestep=timestep, traj_len=traj_len)
