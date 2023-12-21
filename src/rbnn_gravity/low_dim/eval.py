@@ -15,7 +15,7 @@ sys.path.append(parent_dir)
 from models import rbnn_gravity, build_V_gravity
 from utils.integrators import LieGroupVaritationalIntegrator
 from utils.general import setup_reproducibility
-from utils.math import pd_matrix
+from utils.math_utils import pd_matrix
 
 def load_experiment(model, optimizer, filepath: str):
     """"""
