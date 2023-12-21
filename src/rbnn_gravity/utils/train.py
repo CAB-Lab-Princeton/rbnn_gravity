@@ -7,7 +7,7 @@ import sys, os
 import numpy as np
 import torch
 import time
-import glob
+from glob import glob
 
 from data.dataset import build_dataloader, build_dataloader_hd
 from models import rbnn_gravity, rbnn_gravity_hd, MLP
@@ -551,7 +551,7 @@ def latest_checkpoint(model,
     """
     if not os.path.exists(chkptdir):
         print('\n Log directory does not exist. Making it ... \n')
-        os.makedirs(chkptdir)
+        os.makedirs(chkptdir, exist_ok=True)
         
     filenames = glob(chkptdir + '*.pth')
     
