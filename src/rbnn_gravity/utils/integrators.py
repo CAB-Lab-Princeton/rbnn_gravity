@@ -5,7 +5,7 @@
 import numpy as np
 import torch
 
-from utils.math import vee_map, hat_map
+from utils.math_utils import vee_map, hat_map
 
 # 3D Pendulum LGVI
 class LieGroupVaritationalIntegrator():
