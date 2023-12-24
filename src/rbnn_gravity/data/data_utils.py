@@ -134,7 +134,7 @@ def sample_group_matrices_3DP(radius: float, ic_type: str = 'stable', n_samples:
 def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int):
     """"""
     # Euler angles for gyroscope
-    eulers = (np.random.rand(n_samples, 2, 3) - 0.5) * 3
+    eulers = (np.random.rand(n_samples, 2, 3) - 0.5) * 3 #3
 
     # Edit euler angles to be in a desired range (should be psidot >> thetadot >> phidot)
     eulers[:,1,0]*=3 # thetadot [magnitude 4.5]
@@ -142,13 +142,13 @@ def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int):
     eulers[:,1,2] = (np.random.randint(2, size=(n_samples, )) * 2. - 1) * (np.random.randn(n_samples) + 7) * 1.5 # psidot [manigtude 7]
 
     # Assign euler angles
-    theta = eulers[:, 0, 0]
-    phi = eulers[:, 0, 1]
+    theta = eulers[:, 0, 1]
+    phi = eulers[:, 0, 0]
     psi = eulers[:, 0, 2]
 
     # Calculate omega in the body-fixed frame
-    thetadot = eulers[:, 1, 0]
-    phidot = eulers[:, 1, 1]
+    thetadot = eulers[:, 1, 1]
+    phidot = eulers[:, 1, 0]
     psidot = eulers[:, 1, 2]
 
     st = np.sin(theta)
@@ -166,7 +166,7 @@ def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int):
     pi_samples = np.einsum('ij, bj -> bi', MOI, omega)
 
     # Convert the Euler angles to rotation matrices using the ZYZ convention
-    R_samples = eazyz_to_group_matrix(alpha=theta, beta=phi, gamma=psi)
+    R_samples = eazyz_to_group_matrix(alpha=phi, beta=theta, gamma=psi)
 
     return R_samples, pi_samples
 
