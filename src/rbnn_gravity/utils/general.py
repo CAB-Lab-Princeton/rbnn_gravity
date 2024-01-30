@@ -32,14 +32,14 @@ def setup_reproducibility_hd(seed: int, cnn_reprod: bool = True):
 
 def minmax(img: np.ndarray):
     """"""
-    min_val = np.min(img) #, axis=(-2, -1))[..., 0]
-    max_val = np.max(img) #, axis=(-2, -1))[..., 0]
+    min_val = np.min(img, axis=(-2, -1))[..., 0]
+    max_val = np.max(img, axis=(-2, -1))[..., 0]
 
     img_norm = (img - min_val)/(max_val - min_val)
     return img_norm
 
 def gen_gif(img_array: np.ndarray, save_dir: str):
     """"""
-    imgs = [Image.fromarray((minmax(img) * 255).astype('uint8').transpose(1, 2, 0), mode="RGB").resize((128, 128)) for img in img_array[0, ...]]
+    imgs = [Image.fromarray((img * 255).astype('uint8').transpose(1, 2, 0), mode="RGB").resize((128, 128)) for img in img_array[0, ...]]
     # duration is the number of milliseconds between frames; this is 40 frames per second
     imgs[0].save(save_dir, save_all=True, append_images=imgs[1:], duration=50, loop=0)
