@@ -54,6 +54,27 @@ def eazyz_to_group_matrix(alpha: np.ndarray, beta: np.ndarray, gamma: np.ndarray
     
     return DCM
 
+def eazxz_to_group_matrix(alpha: np.ndarray, beta: np.ndarray, gamma: np.ndarray) -> np.ndarray:
+    """"""
+    assert len(alpha) == len(beta) and len(beta) == len(gamma)
+    t1 = alpha
+    t2 = beta
+    t3 = gamma
+
+    c1 = np.cos(t1)
+    c2 = np.cos(t2)
+    c3 = np.cos(t3)
+
+    s1 = np.sin(t1)
+    s2 = np.sin(t2)
+    s3 = np.sin(t3)
+
+    DCM = np.array([[c1*c3 - c2*s1*s3, -c1*s3 - c2*c3*s1, s1*s2],
+                    [c3*s1 + c1*c2*s3, c1*c2*c3 - s1*s3, -c1*s2],
+                    [s2*s3, s2*c3, c2]])
+    
+    return DCM
+
 def s2s2_gram_schmidt(v1, v2):
     """Normalise 2 3-vectors. Project second to orthogonal component.
     Take cross product for third. Stack to form SO matrix."""
