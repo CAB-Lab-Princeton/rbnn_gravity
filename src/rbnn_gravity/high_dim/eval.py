@@ -312,7 +312,7 @@ def potential_energy_eval(args, model):
     x_tensor = torch.tensor(x, requires_grad=True).unsqueeze(0).to(model.device)
 
     # Run model on x_tensor
-    _, _, R_dyn, _, R_enc, _ = model(x=x_tensor.float(), seq_len=x_tensor.shape[1])
+    _, _, R_dyn, omega_dyn, R_enc, omega_enc = model(x=x_tensor.float(), seq_len=x_tensor.shape[1])
 
     # Ground-truth Potential Energy
     mass = 1.
@@ -336,24 +336,60 @@ def potential_energy_eval(args, model):
     V_lr_dyn = model.V(R_dyn.reshape(-1, 9)).squeeze()
     V_lr_dyn_ = V_lr_dyn - V_lr_dyn[0]
 
-    # Generate figure
-    fig_v, axes_v = plt.subplots(nrows=1, ncols=2)
-    axes_v[0].plot(V_gt_ae_.detach().cpu().numpy(), 'k-')
-    axes_v[0].plot(V_lr_ae_.detach().cpu().numpy(), 'b-')
-    axes_v[0].grid()
-    axes_v[0].legend(['GT', 'Learned'])
-    axes_v[0].set_title('Encoder-produced R')
+    # Embedding-based kinetic energy
+    moi_lr = model.calc_moi()
+    T_lr_ae = 0.5 * torch.einsum('btj, jk, btk -> bt', omega_enc, moi_lr, omega_enc).squeeze()
+    T_lr_ae_ = T_lr_ae - T_lr_ae[0]
 
-    axes_v[1].plot(V_gt_dyn_.detach().cpu().numpy(), 'k-')
-    axes_v[1].plot(V_lr_dyn_.detach().cpu().numpy(), 'b-')
-    axes_v[1].grid()
-    axes_v[1].legend(['GT', 'Learned'])
-    axes_v[1].set_title('Dyn-produced R')
+    # Dynamics-based prediction kinetic energy
+    T_lr_dyn = 0.5 * torch.einsum('btj, jk, btk -> bt', omega_dyn, moi_lr, omega_dyn).squeeze()
+    T_lr_dyn_ = T_lr_dyn - T_lr_dyn[0]
+
+    # Total energy
+    E_lr_ae = T_lr_ae_ + V_lr_ae_[:-model.tau]
+    E_lr_dyn = T_lr_dyn_ + V_lr_dyn_
+
+    # Generate figure
+    fig_v, axes_v = plt.subplots(nrows=3, ncols=2, figsize=(20, 20))
+    # axes_v[0].plot(V_gt_ae_.detach().cpu().numpy(), 'k-')
+
+    axes_v[0, 0].plot(V_lr_ae_.detach().cpu().numpy(), 'b-')
+    axes_v[0, 0].grid()
+    axes_v[0, 0].legend(['Learned']) #['GT', 'Learned'])
+    axes_v[0, 0].set_title('Encoding-based V(R) - V($R_0$)')
+
+    # axes_v[1].plot(V_gt_dyn_.detach().cpu().numpy(), 'k-')
+    axes_v[0, 1].plot(V_lr_dyn_.detach().cpu().numpy(), 'b-')
+    axes_v[0, 1].grid()
+    axes_v[0, 1].legend(['Learned']) #['GT', 'Learned'])
+    axes_v[0, 1].set_title('Dynamics-based V(R) - V($R_0$)')
+
+    axes_v[1, 0].plot(T_lr_ae_.detach().cpu().numpy(), 'b-')
+    axes_v[1, 0].grid()
+    axes_v[1, 0].legend(['Learned']) #['GT', 'Learned'])
+    axes_v[1, 0].set_title('Encoding-based T($\Omega$) - T($\Omega_0$)')
+
+    # axes_v[1].plot(V_gt_dyn_.detach().cpu().numpy(), 'k-')
+    axes_v[1, 1].plot(T_lr_dyn_.detach().cpu().numpy(), 'b-')
+    axes_v[1, 1].grid()
+    axes_v[1, 1].legend(['Learned']) #['GT', 'Learned'])
+    axes_v[1, 1].set_title('Dynamics-based T($\Omega$) - T($\Omega_0$)')
+
+    axes_v[2, 0].plot(E_lr_ae.detach().cpu().numpy(), 'b-')
+    axes_v[2, 0].grid()
+    axes_v[2, 0].legend(['Learned']) #['GT', 'Learned'])
+    axes_v[2, 0].set_title('Encoding-based E(R, $\Omega$) - E($R_0$, $\Omega_0$)')
+
+    # axes_v[1].plot(V_gt_dyn_.detach().cpu().numpy(), 'k-')
+    axes_v[2, 1].plot(E_lr_dyn.detach().cpu().numpy(), 'b-')
+    axes_v[2, 1].grid()
+    axes_v[2, 1].legend(['Learned']) #['GT', 'Learned'])
+    axes_v[2, 1].set_title('Dynamics-based E(R, $\Omega$) - E($R_0$, $\Omega_0$)')
     
     if select_cp:
-        plt.savefig(SAVE_DIR + f'potential_functions_{select_cp:06}.pdf')
+        plt.savefig(SAVE_DIR + f'energy_functions_{select_cp:06}.pdf')
     else:
-        plt.savefig(SAVE_DIR + f'potential_functions_end.pdf')
+        plt.savefig(SAVE_DIR + f'energy_functions_end.pdf')
 
 if __name__ == "__main__":
     # Load args
@@ -393,13 +429,21 @@ if __name__ == "__main__":
     model_tr, stats = load_experiment(args=args, model=model, optimizer=optim)
     model_tr.to(device)
     model_tr.device = device
+    
+    model.eval()
+    
+    # Diagonalize MOI
+    e, v = torch.linalg.eig(model_tr.calc_moi())
+
+    # Learned MOI
+    print(f'\n Learned MOI: {model_tr.calc_moi()} and scale: {torch.linalg.norm(model_tr.calc_moi())}\n')
 
     # Plot losses
     print('\n Generating Loss Plots \n')
     generate_loss_plots(args=args, stats=stats)
     
     # Plot potential 
-    print('\n Generating Potential Energy Plots \n')
+    print('\n Generating Energy Plots \n')
     potential_energy_eval(args=args, model=model_tr)
 
     # Reconstruction plots
