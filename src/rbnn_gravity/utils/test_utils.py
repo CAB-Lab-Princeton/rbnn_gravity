@@ -26,20 +26,27 @@ def test_gyroscope(n_sample: int = 10):
     integrator = LieGroupVaritationalIntegrator()
     
     # Potential properties 
-    moi = torch.diag(torch.tensor([1., 1., 2.8]))
+    mass = 8/1000 # kg
+    r = 20/1000 # m
+    l3 = 20/1000 # m
+
+    I_t = 1/2 * mass * (r**2) + (mass * (l3**2))
+    I_a = 1/4 * mass * (r**2)
+
+    moi = torch.diag(torch.tensor([I_t, I_t, I_a]))
     moi_inv = torch.linalg.inv(moi)
 
-    dt = 1e-3
-    traj_len = 1000
-    
+    dt = 1e-4 # s
+    tf = 0.2 # s
+    traj_len = int(tf/dt) # s
+
     # Constants
-    mass = 1.0
     e_3 = torch.tensor([[0., 0., 1.]]).T
     rho_gt = torch.tensor([[0., 0., 1.]])
 
     V_grav = lambda R: build_V_gravity(m=mass, R=R, e_3=e_3, rho_gt=rho_gt)
 
-    R_sample, pi_sample = generate_lowdim_dataset_gyroscope(MOI=moi, n_samples=n_sample, integrator=integrator, timestep=dt, traj_len=traj_len, V=V_grav, seed=seed)
+    R_sample, pi_sample = generate_lowdim_dataset_gyroscope(MOI=moi, mass=mass, l3=l3, general_flag=False, n_samples=n_sample, integrator=integrator, timestep=dt, traj_len=traj_len, V=V_grav, seed=seed)
     
     omega_sample = torch.einsum('ij, btj -> bti', moi_inv, pi_sample)
     ea_samples = group_matrix_to_eazyz(R_sample)
@@ -47,7 +54,7 @@ def test_gyroscope(n_sample: int = 10):
 
 if __name__ == "__main__":
     setup_reproducibility(seed=0)
-    ea, omega = test_gyroscope(10)
+    ea, omega = test_gyroscope(1)
 
     ea = ea.detach().numpy()
     omega = omega.detach().numpy()
@@ -110,6 +117,6 @@ if __name__ == "__main__":
 
     save_dir = f'src/rbnn_gravity/high_dim/results/test/'
     os.makedirs(save_dir, exist_ok=True)
-    plt.savefig(save_dir + 'ea_omega_test_plot.pdf')
+    plt.savefig(save_dir + 'ea_omega_test_plot_slow.pdf')
 
 
