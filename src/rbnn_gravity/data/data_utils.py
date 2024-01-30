@@ -6,7 +6,7 @@ import os, sys
 import numpy as np
 import torch
 
-from utils.math_utils import eazyz_to_group_matrix
+from utils.math_utils import eazyz_to_group_matrix, eazxz_to_group_matrix
 
 # Functions for generating datasets for freely rotating RBD
 def euler_eigvec(MOI: np.ndarray, radius: float) -> np.ndarray:
@@ -131,25 +131,55 @@ def sample_group_matrices_3DP(radius: float, ic_type: str = 'stable', n_samples:
 
     return samples
 
-def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int):
+def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int,  mass: float = 1.0, l: float = 1.0, general_flag: bool = False):
     """"""
-    # Euler angles for gyroscope
-    eulers = (np.random.rand(n_samples, 2, 3) - 0.5) * 3 #3
+    if general_flag:
+        # Euler angles for gyroscope
+        eulers = (np.random.rand(n_samples, 2, 3) - 0.5) * 3 #3
 
-    # Edit euler angles to be in a desired range (should be psidot >> thetadot >> phidot)
-    eulers[:,1,0]*=3 # thetadot [magnitude 4.5]
-    eulers[:,1,1]*=.2 # phidot [magnitude 0.3]
-    eulers[:,1,2] = (np.random.randint(2, size=(n_samples, )) * 2. - 1) * (np.random.randn(n_samples) + 7) * 1.5 # psidot [manigtude 7]
+        # Edit euler angles to be in a desired range (should be psidot >> thetadot >> phidot)
+        eulers[:,1,0]*=3 # phidot [magnitude 4.5]
+        eulers[:,1,1]*=.2 # thetadot [magnitude 0.3]
+        eulers[:,1,2] = (np.random.randint(2, size=(n_samples, )) * 2. - 1) * (np.random.randn(n_samples) + 7) * 1.5 # psidot [manigtude 7]
 
-    # Assign euler angles
-    theta = eulers[:, 0, 1]
-    phi = eulers[:, 0, 0]
-    psi = eulers[:, 0, 2]
+        # Assign Euler angles -- general
+        phi = eulers[:, 0, 0]
+        theta = eulers[:, 0, 1]
+        psi = eulers[:, 0, 2]
 
-    # Calculate omega in the body-fixed frame
-    thetadot = eulers[:, 1, 1]
-    phidot = eulers[:, 1, 0]
-    psidot = eulers[:, 1, 2]
+        # Calculate omega in the body-fixed frame
+        phidot = eulers[:, 1, 0]
+        thetadot = eulers[:, 1, 1]
+        psidot = eulers[:, 1, 2]
+
+        w3 = (phidot * ct) + psidot
+
+    else:
+
+        # Assign Euler angles -- steady top
+        g = 9.8 #gravity
+        I_1 = MOI[0, 0]
+        I_3 = MOI[2, 2]
+
+        eulers = (np.random.rand(n_samples, 3) - 0.5) * (np.pi - 0.1)
+        phi = eulers[:, 0]
+        theta = eulers[:, 1]
+        psi = eulers[:, 2] 
+
+        # Thetadot initialized to zero
+        thetadot = np.zeros((n_samples))
+    
+        # Phidot samples from range
+        w3_min = (2./I_3) * np.sqrt(mass * g * l * I_1 * np.cos(theta))
+        w3 = np.einsum('b, b -> b', (np.random.rand((n_samples)) + 1.1), w3_min)
+
+        phidot_slow = (mass * g * l)/ (I_3 * w3)  
+        phidot_fast = (I_3 * w3)/(I_1 * np.cos(theta))
+
+        # Psidot is calculated
+        phidot = phidot_slow
+        psidot = ((mass * g * l + (I_1 - I_3) * (phidot ** 2) * np.cos(theta))/(I_3 * phidot))
+    
 
     st = np.sin(theta)
     ct = np.cos(theta)
@@ -160,13 +190,13 @@ def sample_group_matrix_gyroscope(MOI: np.ndarray, n_samples: int):
     # Calculate pi in the body frame -- Goldstein 
     w1 = (phidot * st * sp) + (thetadot * cp)
     w2 = (phidot * st * cp) - (thetadot * sp)
-    w3 = (phidot * ct) + psidot
 
     omega = np.stack([w1, w2, w3], axis=-1)
     pi_samples = np.einsum('ij, bj -> bi', MOI, omega)
 
     # Convert the Euler angles to rotation matrices using the ZYZ convention
     R_samples = eazyz_to_group_matrix(alpha=phi, beta=theta, gamma=psi)
+    # R_samples = eazxz_to_group_matrix(alpha=phi, beta=theta, gamma=psi)
 
     return R_samples, pi_samples
 
@@ -185,10 +215,10 @@ def generate_lowdim_dataset_3DP(MOI: np.ndarray, radius: float, n_samples: int, 
     data_R, data_pi = integrator.integrate(pi_init=pi_samples_tensor, moi=MOI, V=V, R_init=R_samples_tensor, timestep=timestep, traj_len=traj_len)
     return data_R, data_pi
 
-def generate_lowdim_dataset_gyroscope(MOI: np.ndarray, n_samples: int, integrator, timestep: float = 1e-3, traj_len: int = 100, V = None, seed: int = 0):
+def generate_lowdim_dataset_gyroscope(MOI: np.ndarray, mass: float, l3: float, n_samples: int, integrator, general_flag: bool = False, timestep: float = 1e-3, traj_len: int = 100, V = None, seed: int = 0):
     """"""
     # Sample initial conditions
-    R_samples, pi_samples = sample_group_matrix_gyroscope(MOI=MOI, n_samples=n_samples)
+    R_samples, pi_samples = sample_group_matrix_gyroscope(MOI=MOI, n_samples=n_samples, mass=mass, l=l3, general_flag=False)
 
     # Make samples tensors
     R_samples_tensor = torch.tensor(R_samples, requires_grad=True).permute(2, 0, 1)
