@@ -357,6 +357,7 @@ class DecoderRBNN_gravity(nn.Module):
         
         """
         # assert torch.any(x.isnan()) == False and torch.any(x.isinf()) == False
+        sig = torch.nn.Sigmoid()
         x_ = x[:, :2, ...].reshape(-1, 6)
         
         h7 = self.linear7(x_)
@@ -368,6 +369,6 @@ class DecoderRBNN_gravity(nn.Module):
         h3 = self.conv3(self.nonlin(h4))
         h2 = self.bn2(h3)
         h2 = self.conv2(self.nonlin(self.maxunpool2(h2, indices2)))
-        x_dec = self.conv1(self.nonlin(h2))
+        x_dec = sig(self.conv1(self.nonlin(h2)))
         return x_dec    
 
