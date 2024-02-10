@@ -10,8 +10,8 @@ import time
 from glob import glob
 
 from data.dataset import build_dataloader, build_dataloader_hd
-from models import rbnn_gravity, rbnn_gravity_hd, MLP
-from autoencoder import EncoderRBNN_gravity, DecoderRBNN_gravity
+from models import rbnn_gravity, rbnn_gravity_hd, MLP, rbnn_gravity_content
+from autoencoder import EncoderRBNN_gravity, DecoderRBNN_gravity, EncoderRBNN_content, DecoderRBNN_content
 from utils.integrators import LieGroupVaritationalIntegrator, Harsh_LGVI
 from utils.general import setup_reproducibility, setup_reproducibility_hd
 
@@ -383,6 +383,73 @@ def run_experiment_hd(args):
 
     # Initialize model and optimizer
     model = rbnn_gravity_hd(encoder=encoder,
+                        decoder=decoder,
+                        estimator=omega_estimator,
+                        integrator=lgvi_integrator,
+                        in_dim=args.V_in_dims,
+                        hidden_dim=args.V_hidden_dims,
+                        out_dim=args.V_out_dims,
+                        tau=args.tau, 
+                        dt=args.dt, 
+                        I_diag=args.moi_diag, 
+                        I_off_diag=args.moi_off_diag, 
+                        V=V_learned)
+    model.to(device)
+    model.device = device
+
+    # Create dataloaders
+    print('\n Building the dataloaders ... \n')
+    train_dataloader, test_dataloader, val_dataloader = build_dataloader_hd(args=args)
+
+    # Loss function
+    loss = high_dim_loss
+
+    # Retrain model
+    if args.retrain_model:
+        args.save_dir = args.save_dir[:-4] + "-retrain.pth"
+        print(f'\n New save directory for re-trained model: {args.save_dir} ... \n')
+
+    # Train model
+    print(f'\n Training model on device ({device}) ... \n')
+    t0 = time.time()
+    train_loss, optim = train_hd(args=args, model=model, traindataloader=train_dataloader, valdataloader=val_dataloader, loss_fcn=loss, early_stopper=early_stopper)
+    
+    train_time = time.time() - t0
+    print(f'\n Training time: {train_time} \n')
+
+    # Save model
+    if args.save_model:
+        print(f'\n Saving experiment {args.exp_name} from date {args.date} ... \n')
+        save_experiment(args=args, model=model, optimizer=optim, loss=train_loss) 
+
+# Auxilary function for content-dynamics separated experiments    
+def run_experiment_content(args):
+    """"""
+    # Set up reproducibility
+    print(f'\n Setting up reproducibility with seed: {args.seed} ... \n')
+    setup_reproducibility_hd(seed=args.seed)
+
+    # Set up GPU
+    device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else "cpu")
+    
+    # Initialize potential energy function as an MLP
+    V_learned = MLP(args.V_in_dims, args.V_hidden_dims, args.V_out_dims)
+
+    # Initialize angular estimator
+    omega_estimator = MLP(args.V_in_dims * args.tau, args.V_hidden_dims, 3)
+
+    # Initialize integrator
+    lgvi_integrator = LieGroupVaritationalIntegrator()
+
+    # Early stopper
+    early_stopper = EarlyStopper(patience=args.patience, min_delta=args.min_delta)
+
+    # Initialize encoder and decoder
+    encoder = EncoderRBNN_content(content_dim=args.content_dim)
+    decoder = DecoderRBNN_content(content_dim=args.content_dim)
+
+    # Initialize model and optimizer
+    model = rbnn_gravity_content(encoder=encoder,
                         decoder=decoder,
                         estimator=omega_estimator,
                         integrator=lgvi_integrator,
