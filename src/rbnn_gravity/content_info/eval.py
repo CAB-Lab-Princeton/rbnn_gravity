@@ -4,6 +4,7 @@
 
 import sys, os
 import argparse
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -17,7 +18,7 @@ from models import rbnn_gravity_content, build_V_gravity, MLP
 from autoencoder import EncoderRBNN_content, DecoderRBNN_content
 from utils.integrators import LieGroupVaritationalIntegrator
 from utils.general import setup_reproducibility_hd, gen_gif
-from utils.math_utils import pd_matrix, mean_confidence_interval
+from utils.math_utils import pd_matrix, mean_confidence_interval, group_matrix_to_quaternions
 from utils.train import latest_checkpoint, load_checkpoint
 from data.dataset import shuffle_and_split
 
@@ -97,12 +98,9 @@ def load_experiment(args, model, optimizer):
     
     return model, stats
 
-# Evaluation functions
-def content_dynamics_swap(args, model, optimizer):
-    # Load trained model
-    model_trained = model
-
-    # Load all datasets for comparison
+# Generate Datasets
+def gen_datasets_eval(args):
+    """"""
     data_dir = args.data_dir
     date = args.date
 
@@ -124,9 +122,51 @@ def content_dynamics_swap(args, model, optimizer):
         test_dataset = rd_split[2] 
 
     # Generate random sample for evaluation
-    x_train = torch.tensor(train_dataset[:2, ...], device=model.device)
-    x_test = torch.tensor(test_dataset[:2, ...], device=model.device)
-    x_val = torch.tensor(val_dataset[:2, ...], device=model.device)
+    x_train = torch.tensor(train_dataset, device=model.device)
+    x_test = torch.tensor(test_dataset, device=model.device)
+    x_val = torch.tensor(val_dataset, device=model.device)
+
+    return x_train, x_test, x_val
+
+# Visualize the latent space using quaternions
+def latent_space_viz(args, model, x_test):
+    """"""
+    # Select a batch of images
+    n_batch = torch.randperm(x_test.shape[0])[:10]
+
+    # load args
+    dataset = args.experiment_type
+    date = datetime.today().strftime('%m%d%Y')
+
+    # load all test sets for comparison
+    x_eval = x_test[n_batch, ...]
+    _, _, R_dyn, omega_dyn, R_enc, omega_enc = model(x_eval.float(), seq_len=x_eval.shape[1])
+
+    q_dyn = group_matrix_to_quaternions(R_dyn)
+    q_enc = group_matrix_to_quaternions(R_enc)
+
+    import pdb; pdb.set_trace()
+
+    # Generate semilogy plot of training loss
+    fig = plt.figure()
+
+    ax = fig.add_subplot(1, 1, 1)
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
+
+    # run model 
+    
+    
+# Content vector swamp in same dataset
+
+# Evaluation functions
+def content_dynamics_swap(args, model, x_test):
+    # Load trained model
+    model_trained = model
+    dataset = args.name
+    date = args.date
+
+    # Load all datasets for comparison
+    x_eval = x_test[:2, ...]
 
     print('\n Loading Data ... \n')
     # CLOUDSAT DATA
@@ -153,57 +193,57 @@ def content_dynamics_swap(args, model, optimizer):
 
     # Compute dynamics code for the 2 trajectories from the trained dataset
 
-    xhat_dyn_cal0, _, R_dyn_cal0, _, _, _ = model_trained(x_train[0, ...][None, ...].float(), seq_len=x_train.shape[1])
-    xhat_dyn_cal1, _, R_dyn_cal1, _, _, _ = model_trained(x_train[1, ...][None, ...].float(), seq_len=x_train.shape[1])
+    xhat_dyn_cal0, _, R_dyn_cal0, _, _, _ = model_trained(x_eval[0, ...][None, ...].float(), seq_len=x_eval.shape[1])
+    xhat_dyn_cal1, _, R_dyn_cal1, _, _, _ = model_trained(x_eval[1, ...][None, ...].float(), seq_len=x_eval.shape[1])
 
     R_dyn_cal0_rs = R_dyn_cal0.reshape(-1, 3, 3)
     R_dyn_cal1_rs = R_dyn_cal1.reshape(-1, 3, 3)
 
-    xhat_dyn_cal0 = xhat_dyn_cal0.reshape(-1, x_train.shape[1], 3, 28, 28)
-    xhat_dyn_cal1 = xhat_dyn_cal1.reshape(-1, x_train.shape[1], 3, 28, 28)
+    xhat_dyn_cal0 = xhat_dyn_cal0.reshape(-1, x_eval.shape[1], 3, 28, 28)
+    xhat_dyn_cal1 = xhat_dyn_cal1.reshape(-1, x_eval.shape[1], 3, 28, 28)
 
     print('\n Compute content codes and decoding ... \n')
 
     # Cloudsat content code and image prediction
 
     zC0_cs, _ = model_trained.encode(cloudsat_example[:, 0, ...][:, None, ...])  # [bs, 1, content_dim]
-    zC_cs = zC0_cs.repeat(1, x_train.shape[1], 1) # [bs, traj_len, content_dim]
+    zC_cs = zC0_cs.repeat(1, x_eval.shape[1], 1) # [bs, traj_len, content_dim]
     zC_cs_rs = zC_cs.reshape(-1, model_trained.encoder.content_dim) # [pbs, content_dim]
-
-    xhat_cs0 = model_trained.decode(z_content=zC_cs_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
-    xhat_cs1 = model_trained.decode(z_content=zC_cs_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
+    
+    xhat_cs0 = model_trained.decode(z_content=zC_cs_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
+    xhat_cs1 = model_trained.decode(z_content=zC_cs_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
 
     # Ucube content code and image prediction
     zC0_uc, _ = model_trained.encode(ucube_example[:, 0, ...][:, None, ...])  # [bs, 1, content_dim]
-    zC_uc = zC0_uc.repeat(1, x_train.shape[1], 1) # [bs, traj_len, content_dim]
+    zC_uc = zC0_uc.repeat(1, x_eval.shape[1], 1) # [bs, traj_len, content_dim]
     zC_uc_rs = zC_uc.reshape(-1, model_trained.encoder.content_dim) # [pbs, content_dim]
 
-    xhat_uc0 = model_trained.decode(z_content=zC_uc_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
-    xhat_uc1 = model_trained.decode(z_content=zC_uc_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
+    xhat_uc0 = model_trained.decode(z_content=zC_uc_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
+    xhat_uc1 = model_trained.decode(z_content=zC_uc_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
 
     # Uprism content code and image prediction
     zC0_up, _ = model_trained.encode(uprism_example[:, 0, ...][:, None, ...])  # [bs, 1, content_dim]
-    zC_up = zC0_up.repeat(1, x_train.shape[1], 1) # [bs, traj_len, content_dim]
+    zC_up = zC0_up.repeat(1, x_eval.shape[1], 1) # [bs, traj_len, content_dim]
     zC_up_rs = zC_up.reshape(-1, model_trained.encoder.content_dim) # [pbs, content_dim]
 
-    xhat_up0 = model_trained.decode(z_content=zC_up_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
-    xhat_up1 = model_trained.decode(z_content=zC_up_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
+    xhat_up0 = model_trained.decode(z_content=zC_up_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
+    xhat_up1 = model_trained.decode(z_content=zC_up_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
 
     # NUcube content code and image prediction
     zC0_nuc, _ = model_trained.encode(nucube_example[:, 0, ...][:, None, ...])  # [bs, 1, content_dim]
-    zC_nuc = zC0_nuc.repeat(1, x_train.shape[1], 1) # [bs, traj_len, content_dim]
+    zC_nuc = zC0_nuc.repeat(1, x_eval.shape[1], 1) # [bs, traj_len, content_dim]
     zC_nuc_rs = zC_nuc.reshape(-1, model_trained.encoder.content_dim) # [pbs, content_dim]
 
-    xhat_nuc0 = model_trained.decode(z_content=zC_nuc_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
-    xhat_nuc1 = model_trained.decode(z_content=zC_nuc_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
+    xhat_nuc0 = model_trained.decode(z_content=zC_nuc_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
+    xhat_nuc1 = model_trained.decode(z_content=zC_nuc_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
 
     # Uprism content code and image prediction
     zC0_nup, _ = model_trained.encode(nuprism_example[:, 0, ...][:, None, ...])  # [bs, 1, content_dim]
-    zC_nup = zC0_nup.repeat(1, x_train.shape[1], 1) # [bs, traj_len, content_dim]
+    zC_nup = zC0_nup.repeat(1, x_eval.shape[1], 1) # [bs, traj_len, content_dim]
     zC_nup_rs = zC_nup.reshape(-1, model_trained.encoder.content_dim) # [pbs, content_dim]
 
-    xhat_nup0 = model_trained.decode(z_content=zC_nup_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
-    xhat_nup1 = model_trained.decode(z_content=zC_nup_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_train.shape[1], 3, 28, 28)
+    xhat_nup0 = model_trained.decode(z_content=zC_nup_rs, z_dyn=R_dyn_cal0_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
+    xhat_nup1 = model_trained.decode(z_content=zC_nup_rs, z_dyn=R_dyn_cal1_rs).reshape(-1, x_eval.shape[1], 3, 28, 28)
 
     print('\n Generate results plots ... \n')
 
@@ -278,8 +318,8 @@ if __name__ == "__main__":
     lgvi_integrator = LieGroupVaritationalIntegrator()
 
     # Initialize encoder and decoder
-    encoder = EncoderRBNN_content(content_dim=50)
-    decoder = DecoderRBNN_content(content_dim=50)
+    encoder = EncoderRBNN_content(content_dim=15)
+    decoder = DecoderRBNN_content(content_dim=15)
 
     # Initialize model and optimizer
     model = rbnn_gravity_content(encoder=encoder,
@@ -304,6 +344,11 @@ if __name__ == "__main__":
     model_tr.device = device
     
     model.eval()
+
+    # Generate data for evaluation 
+    x_train, x_test, x_val = gen_datasets_eval(args)
     
+    # Visualize latent states with cotent information
+    latent_space_viz(args=args, model=model_tr, x_test=x_test)
     # Generate content-dynamics plots
-    content_dynamics_swap(args=args, model=model_tr, optimizer=optim)
+    content_dynamics_swap(args=args, model=model_tr, x_test=x_test)
