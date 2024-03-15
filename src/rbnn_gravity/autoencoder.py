@@ -119,7 +119,12 @@ class EncoderRBNN(nn.Module):
   
         x_enc_SO3 = self.map_s2s2_so3(z1=z1_enc, z2=z2_enc)
 
-        return x_enc_SO3, indices2, indices4
+        # List for maxpooling indices
+        indices = dict((f'indices{2*i}', None) for i in range(1, 3))
+        indices['indices2'] = indices2
+        indices['indices4'] = indices4
+
+        return x_enc_SO3, indices
 
 class DecoderRBNN(nn.Module):
     """
@@ -296,7 +301,12 @@ class EncoderRBNN_gravity(nn.Module):
    
         x_enc_SO3 = self.map_s2s2_so3(z1=z1_enc, z2=z2_enc)
 
-        return x_enc_SO3, indices2, indices4
+        # List for maxpooling indices
+        indices = dict((f'indices{2*i}', None) for i in range(1, 3))
+        indices['indices2'] = indices2
+        indices['indices4'] = indices4
+
+        return x_enc_SO3, indices
     
 class DecoderRBNN_gravity(nn.Module):
     """
@@ -475,7 +485,12 @@ class EncoderRBNN_content(nn.Module):
    
         z_enc_SO3 = self.map_s2s2_so3(z1=z1_enc, z2=z2_enc)
 
-        return z_content, z_enc_SO3, indices2, indices4
+        # List for maxpooling indices
+        indices = dict((f'indices{2*i}', None) for i in range(1, 3))
+        indices['indices2'] = indices2
+        indices['indices4'] = indices4
+
+        return z_content, z_enc_SO3, indices
     
 class DecoderRBNN_content(nn.Module):
     """
@@ -516,7 +531,7 @@ class DecoderRBNN_content(nn.Module):
         self.conv2 = nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=3)
         self.conv1 = nn.ConvTranspose2d(in_channels=16, out_channels=3, kernel_size=3)
                 
-    def forward(self, x_content: torch.Tensor, x_dynamics: torch.Tensor, indices2, indices4) -> torch.Tensor:
+    def forward(self, x_content: torch.Tensor, x_dynamics: torch.Tensor, indices2 = None, indices4 = None) -> torch.Tensor:
         """
         Compute the encoding for a sequence of images.
         
@@ -597,10 +612,10 @@ class EncoderRBNN_HR(nn.Module):
         self.bn8 =  nn.BatchNorm2d(128)
 
         self.flatten8 = nn.Flatten(start_dim=1)
-        self.linear8 = nn.Linear(in_features=128*16*16, out_features=120)
+        self.linear9 = nn.Linear(in_features=128*10*10, out_features=120)
         self.bn9 = nn.BatchNorm1d(120)
-        self.linear9 = nn.Linear(in_features=120, out_features=84)
-        self.linear10 = nn.Linear(in_features=84, out_features=latent_dim, bias=False)
+        self.linear10 = nn.Linear(in_features=120, out_features=84)
+        self.linear11 = nn.Linear(in_features=84, out_features=latent_dim, bias=False)
 
     def map_s2s2_so3(self, z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
         """"""
@@ -627,7 +642,88 @@ class EncoderRBNN_HR(nn.Module):
         h5 = self.nonlin(self.conv5(h4))
         h6, indices6 = self.maxpool6(self.nonlin(self.conv6(h5)))
         h6 = self.bn6(h6)
-        h7 = self.nonlin(self.conv7())
+        h7 = self.nonlin(self.conv7(h6))
+        h8, indices8 = self.maxpool8(self.nonlin(self.conv8(h7)))
+
+        # Push feature map through linear layers
+        h8 = self.flatten8(self.bn8(h8))
+        h9 = self.bn9(self.nonlin(self.linear9(h8)))
+        h10 = self.nonlin(self.linear10(h9))
+        x_enc = self.linear11(h10)
+        
+        # Map from S2 \times S2 to SO(3)
+        z1_enc = x_enc[:, :3]
+        z2_enc = x_enc[:, 3:]
+        x_enc_SO3 = self.map_s2s2_so3(z1=z1_enc, z2=z2_enc)
+
+        # List for maxpooling indices
+        indices = dict((f'indices{2*i}', None) for i in range(1, 5))
+        indices['indices2'] = indices2
+        indices['indices4'] = indices4
+        indices['indices6'] = indices6
+        indices['indices8'] = indices8
+
+        return x_enc_SO3, indices
 
 class DecoderRBNN_HR(nn.Module):
-    pass
+    def __init__(self,
+                  in_channels: int = 6,
+                    nonlinearity = torch.nn.GELU()) -> None:
+        super().__init__()
+        self.nonlin = nonlinearity
+        
+        self.linear11 = nn.Linear(in_features=in_channels, out_features=84)
+        self.linear10 = nn.Linear(in_features=84, out_features=120)
+        self.bn9 = nn.BatchNorm1d(120)
+        self.linear9 = nn.Linear(in_features=120, out_features=128*10*10)
+        self.unflatten8 = nn.Unflatten(dim=1, unflattened_size=(128, 10, 10))
+        
+        self.bn8 = nn.BatchNorm2d(128)
+        self.maxunpool8 = nn.MaxUnpool2d(2, 2)
+        self.conv8 = nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=3)
+        self.conv7 = nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=3)
+
+        self.bn6 = nn.BatchNorm2d(64)
+        self.maxunpool6 = nn.MaxUnpool2d(2, 2)
+        self.conv6 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=3)
+        self.conv5 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=3)
+
+        self.bn4 = nn.BatchNorm2d(32)
+        self.maxunpool4 = nn.MaxUnpool2d(2, 2)
+        self.conv4 = nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3)
+        self.conv3 = nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=3)
+
+        self.bn2 = nn.BatchNorm2d(16)
+        self.maxunpool2 = nn.MaxUnpool2d(2, 2)
+        self.conv2 = nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=5) # increase filter size to make sure output is 224 x 224
+        self.conv1 = nn.ConvTranspose2d(in_channels=16, out_channels=3, kernel_size=5)
+
+    def forward(self, x: torch.Tensor, indices2, indices4, indices6, indices8):
+        """"""
+        sig = torch.nn.Sigmoid()
+        x_ = x[:, :2, ...].reshape(-1, 6)
+
+        # Push through reverse linear layers
+        h11 = self.linear11(x_)
+        h10 = self.linear10(self.nonlin(h11))
+        h9 = self.linear9(self.nonlin(self.bn9(h10)))
+        h8_ = self.bn8(self.unflatten8(h9))
+        
+        # Push through transpose convolution layers
+        h8 = self.conv8(self.nonlin(self.maxunpool8(h8_, indices8)))
+        h7 = self.conv7(self.nonlin(h8))
+        h6_ = self.bn6(h7)
+
+        h6 = self.conv6(self.nonlin(self.maxunpool6(h6_, indices6)))
+        h5 = self.conv5(self.nonlin(h6))
+        h4_ = self.bn4(h5)
+
+        h4 = self.conv4(self.nonlin(self.maxunpool4(h4_, indices4)))
+        h3 = self.conv3(self.nonlin(h4))
+        h2_ = self.bn2(h3)
+
+        h2 = self.conv2(self.nonlin(self.maxunpool2(h2_, indices2)))
+        x_dec = sig(self.conv1(self.nonlin(h2)))
+
+        return x_dec
+
