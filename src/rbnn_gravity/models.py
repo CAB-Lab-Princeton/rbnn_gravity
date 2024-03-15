@@ -125,8 +125,7 @@ class rbnn_gravity_hd(rbnn_gravity):
     
     self.encoder = encoder
     self.decoder = decoder
-    self.indices2 = None
-    self.indices4 = None
+    self.indices = None
     self.estimator = MLP(self.in_dim * self.tau, self.hidden_dim, 3) if estimator is None else estimator
   
   def data_preprocess(self, x: torch.Tensor):
@@ -153,31 +152,27 @@ class rbnn_gravity_hd(rbnn_gravity):
     Method to encode from image space to SO(3) latent space
     """
     # Encode images
-    z, indices2, indices4 = self.encoder(x)
+    z, indices = self.encoder(x)
 
     # Set indices 
-    self.indices2 = indices2
-    self.indices4 = indices4
+    self.indices = indices
 
     return z
 
   def decode(self, z: torch.Tensor):
     """"""
-    # Reshape indices
-    if self.indices2.shape[0] != z.shape[0]:
-        batch_size = int(z.shape[0]/self.indices2.shape[0])
-        indices2 = self.indices2.repeat([batch_size, 1, 1, 1])
-    else:
-        indices2 = self.indices2
+    # Count number of indices
+    sorted_keys = sorted(self.indices.keys())
     
-    if self.indices4.shape[0] != z.shape[0]:
-        batch_size = int(z.shape[0]/self.indices4.shape[0])
-        indices4 = self.indices4.repeat([batch_size, 1, 1, 1])
-    else:
-        indices4 = self.indices4
-    
+    # Loop to reshape all indicies
+    for idx in  sorted_keys:
+      indices_ = self.indices[idx]
+      if indices_.shape[0] != z.shape[0]:
+        batch_size = int(z.shape[0]/indices_.shape[0])
+        self.indices[idx] = indices_.repeat([batch_size, 1, 1, 1])
+
     # Decode latent state
-    xhat = self.decoder(z, indices2, indices4)
+    xhat = self.decoder(z, **self.indices)
     return xhat
 
   def forward(self, x: torch.Tensor, seq_len: int = 2):
@@ -274,8 +269,7 @@ class rbnn_gravity_content(rbnn_gravity):
     
     self.encoder = encoder
     self.decoder = decoder
-    self.indices2 = None
-    self.indices4 = None
+    self.indices = None
     self.estimator = MLP(self.in_dim * self.tau, self.hidden_dim, 3) if estimator is None else estimator
   
   def data_preprocess(self, x: torch.Tensor):
@@ -302,31 +296,27 @@ class rbnn_gravity_content(rbnn_gravity):
     Method to encode from image space to SO(3) latent space
     """
     # Encode images
-    z_content, z_dyn, indices2, indices4 = self.encoder(x)
+    z_content, z_dyn, indices = self.encoder(x)
 
     # Set indices 
-    self.indices2 = indices2
-    self.indices4 = indices4
+    self.indices = indices
 
     return z_content, z_dyn
 
   def decode(self, z_content: torch.Tensor, z_dyn: torch.Tensor):
     """"""
-    # Reshape indices
-    if self.indices2.shape[0] != z_dyn.shape[0]:
-        batch_size = int(z_dyn.shape[0]/self.indices2.shape[0])
-        indices2 = self.indices2.repeat([batch_size, 1, 1, 1])
-    else:
-        indices2 = self.indices2
+     # Count number of indices
+    sorted_keys = sorted(self.indices.keys())
     
-    if self.indices4.shape[0] != z_dyn.shape[0]:
-        batch_size = int(z_dyn.shape[0]/self.indices4.shape[0])
-        indices4 = self.indices4.repeat([batch_size, 1, 1, 1])
-    else:
-        indices4 = self.indices4
-    
+    # Loop to reshape all indicies
+    for idx in  sorted_keys:
+      indices_ = self.indices[idx]
+      if indices_.shape[0] != z_content.shape[0]:
+        batch_size = int(z_content.shape[0]/indices_.shape[0])
+        self.indices[idx] = indices_.repeat([batch_size, 1, 1, 1])
+
     # Decode latent state
-    xhat = self.decoder(z_content, z_dyn, indices2, indices4)
+    xhat = self.decoder(z_content, z_dyn, **self.indices)
     return xhat
 
   def forward(self, x: torch.Tensor, seq_len: int = 2):
