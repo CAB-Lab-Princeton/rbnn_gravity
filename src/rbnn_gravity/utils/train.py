@@ -224,9 +224,6 @@ def train_epoch_hd(args, model, dataloader, optimizer, loss_fcn):
         # Load data onto device
         data_x = data_x.to(model.device).float()
 
-        if data_x.shape[-1] == 3:
-            data_x = data_x.permute(0, 1, 4, 2 ,3)
-
         # Data should be dtype float
         # data_x.type(torch.float)
 
@@ -279,9 +276,6 @@ def eval_epoch_hd(args, model, dataloader, loss_fcn):
         
         # Load data onto device
         data_x = data_x.to(model.device).float()
-
-        if data_x.shape[-1] == 3:
-            data_x = data_x.permute(0, 1, 4, 2 ,3)
 
         # Data should be dtype float
         # data_x.type(torch.float)
